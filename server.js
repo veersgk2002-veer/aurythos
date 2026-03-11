@@ -1,225 +1,137 @@
-const express = require("express")
-const cors = require("cors")
-const multer = require("multer")
-const fs = require("fs")
-const path = require("path")
-const jwt = require("jsonwebtoken")
-const bcrypt = require("bcryptjs")
-const crypto = require("crypto")
+const express = require("express");
+const multer = require("multer");
+const { createClient } = require("@supabase/supabase-js");
 
-const app = express()
+const app = express();
 
-app.use(cors())
-app.use(express.json())
-app.use(express.static(path.join(__dirname,"public")))
+/* ==============================
+   SUPABASE CONFIG
+============================== */
 
-const SECRET = "aurythos_secret_key"
-const ENC_KEY = crypto.createHash("sha256").update("aurythos_file_key").digest()
+const SUPABASE_URL = "https://ybyljhalhkekelepceox.supabase.co";
+const SUPABASE_KEY = "sb_publishable_piRhchIcAr95wRJ-D7eROQ_ITzRd36u";
 
-if(!fs.existsSync("uploads")){
-fs.mkdirSync("uploads")
-}
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-if(!fs.existsSync("users.json")){
-fs.writeFileSync("users.json","[]")
-}
+/* ==============================
+   MIDDLEWARE
+============================== */
 
-function loadUsers(){
-return JSON.parse(fs.readFileSync("users.json"))
-}
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-function saveUsers(users){
-fs.writeFileSync("users.json",JSON.stringify(users,null,2))
-}
+/* ==============================
+   FILE UPLOAD SETUP
+============================== */
 
-function auth(req,res,next){
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
-let token=req.headers.authorization
+/* ==============================
+   HOME
+============================== */
 
-if(!token){
-return res.status(401).json({error:"No token"})
-}
+app.get("/", (req, res) => {
+  res.send("Secure Vault Server Running");
+});
 
-token = token.replace("Bearer ","")
+/* ==============================
+   UPLOAD FILE
+============================== */
 
-try{
+app.post("/upload", upload.single("file"), async (req, res) => {
 
-const data=jwt.verify(token,SECRET)
-req.user=data.email
-next()
+  try {
 
-}catch{
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
 
-res.status(401).json({error:"Invalid token"})
+    const file = req.file;
+    const fileName = Date.now() + "-" + file.originalname;
 
-}
+    const { data, error } = await supabase.storage
+      .from("vault-files")
+      .upload(fileName, file.buffer, {
+        contentType: file.mimetype
+      });
 
-}
+    if (error) {
+      return res.status(500).json(error);
+    }
 
-function encryptFile(input,output){
+    res.json({
+      message: "File uploaded successfully",
+      file: data
+    });
 
-const iv = crypto.randomBytes(16)
-const cipher = crypto.createCipheriv("aes-256-cbc",ENC_KEY,iv)
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 
-const inputStream = fs.createReadStream(input)
-const outputStream = fs.createWriteStream(output)
+});
 
-outputStream.write(iv)
+/* ==============================
+   LIST FILES
+============================== */
 
-inputStream.pipe(cipher).pipe(outputStream)
+app.get("/files", async (req, res) => {
 
-}
+  try {
 
-function decryptFile(input,res){
+    const { data, error } = await supabase.storage
+      .from("vault-files")
+      .list("", { limit: 100 });
 
-const inputStream = fs.createReadStream(input)
+    if (error) {
+      return res.status(500).json(error);
+    }
 
-let iv = Buffer.alloc(16)
+    res.json({
+      files: data
+    });
 
-inputStream.read(iv)
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 
-const decipher = crypto.createDecipheriv("aes-256-cbc",ENC_KEY,iv)
+});
 
-inputStream.pipe(decipher).pipe(res)
+/* ==============================
+   DOWNLOAD FILE
+============================== */
 
-}
+app.get("/download/:filename", async (req, res) => {
 
-const storage = multer.diskStorage({
+  try {
 
-destination:function(req,file,cb){
+    const fileName = req.params.filename;
 
-const userFolder = path.join("uploads",req.user)
+    const { data, error } = await supabase.storage
+      .from("vault-files")
+      .download(fileName);
 
-if(!fs.existsSync(userFolder)){
-fs.mkdirSync(userFolder,{recursive:true})
-}
+    if (error) {
+      return res.status(500).json(error);
+    }
 
-cb(null,userFolder)
+    const buffer = Buffer.from(await data.arrayBuffer());
 
-},
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.send(buffer);
 
-filename:function(req,file,cb){
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 
-const name = Date.now()+"-"+file.originalname
-cb(null,name)
+});
 
-}
+/* ==============================
+   SERVER
+============================== */
 
-})
+const PORT = 3000;
 
-const upload = multer({storage:storage})
-
-app.post("/register",async(req,res)=>{
-
-const {email,password}=req.body
-
-let users=loadUsers()
-
-if(users.find(u=>u.email===email)){
-return res.json({error:"User exists"})
-}
-
-const hash=await bcrypt.hash(password,10)
-
-users.push({email,password:hash})
-
-saveUsers(users)
-
-const userFolder = path.join("uploads",email)
-
-if(!fs.existsSync(userFolder)){
-fs.mkdirSync(userFolder,{recursive:true})
-}
-
-res.json({status:"registered"})
-
-})
-
-app.post("/login",async(req,res)=>{
-
-const {email,password}=req.body
-
-const users=loadUsers()
-
-const user=users.find(u=>u.email===email)
-
-if(!user){
-return res.json({error:"Invalid"})
-}
-
-const ok=await bcrypt.compare(password,user.password)
-
-if(!ok){
-return res.json({error:"Invalid"})
-}
-
-const token=jwt.sign({email},SECRET)
-
-res.json({token})
-
-})
-
-app.post("/upload",auth,upload.single("file"),(req,res)=>{
-
-const filePath=req.file.path
-const encryptedPath=filePath+".enc"
-
-encryptFile(filePath,encryptedPath)
-
-setTimeout(()=>{
-fs.unlinkSync(filePath)
-},500)
-
-res.json({status:"encrypted and stored"})
-
-})
-
-app.get("/files",auth,(req,res)=>{
-
-try{
-
-const userFolder = path.join("uploads",req.user)
-
-if(!fs.existsSync(userFolder)){
-return res.json({files:[]})
-}
-
-const files=fs.readdirSync(userFolder).filter(f=>f.endsWith(".enc"))
-
-res.json({files})
-
-}catch{
-
-res.json({files:[]})
-
-}
-
-})
-
-app.get("/download/:name",auth,(req,res)=>{
-
-const file=path.join("uploads",req.user,req.params.name)
-
-if(!fs.existsSync(file)){
-return res.status(404).send("File not found")
-}
-
-decryptFile(file,res)
-
-})
-
-app.delete("/delete/:name",auth,(req,res)=>{
-
-const file=path.join("uploads",req.user,req.params.name)
-
-if(fs.existsSync(file)){
-fs.unlinkSync(file)
-}
-
-res.json({status:"deleted"})
-
-})
-
-app.listen(3000,()=>{
-console.log("Server running on http://localhost:3000")
-})
+app.listen(PORT, () => {
+  console.log("Server running on http://localhost:3000");
+});
