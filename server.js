@@ -4,40 +4,64 @@ const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
 
-/* ==============================
+/* ===============================
    SUPABASE CONFIG
-============================== */
+=============================== */
 
 const SUPABASE_URL = "https://ybyljhalhkekelepceox.supabase.co";
 const SUPABASE_KEY = "sb_publishable_piRhchIcAr95wRJ-D7eROQ_ITzRd36u";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* ==============================
+/* ===============================
    MIDDLEWARE
-============================== */
+=============================== */
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/* ==============================
+/* ===============================
    FILE UPLOAD SETUP
-============================== */
+=============================== */
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-/* ==============================
-   HOME
-============================== */
+/* ===============================
+   HOME ROUTE
+=============================== */
 
 app.get("/", (req, res) => {
   res.send("Secure Vault Server Running");
 });
 
-/* ==============================
+/* ===============================
+   LIST FILES
+=============================== */
+
+app.get("/files", async (req, res) => {
+
+  try {
+
+    const { data, error } = await supabase.storage
+      .from("vault-files")
+      .list("", { limit: 100 });
+
+    if (error) {
+      return res.status(500).json(error);
+    }
+
+    res.json({ files: data });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+
+});
+
+/* ===============================
    UPLOAD FILE
-============================== */
+=============================== */
 
 app.post("/upload", upload.single("file"), async (req, res) => {
 
@@ -71,67 +95,12 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
 });
 
-/* ==============================
-   LIST FILES
-============================== */
-
-app.get("/files", async (req, res) => {
-
-  try {
-
-    const { data, error } = await supabase.storage
-      .from("vault-files")
-      .list("", { limit: 100 });
-
-    if (error) {
-      return res.status(500).json(error);
-    }
-
-    res.json({
-      files: data
-    });
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-
-});
-
-/* ==============================
-   DOWNLOAD FILE
-============================== */
-
-app.get("/download/:filename", async (req, res) => {
-
-  try {
-
-    const fileName = req.params.filename;
-
-    const { data, error } = await supabase.storage
-      .from("vault-files")
-      .download(fileName);
-
-    if (error) {
-      return res.status(500).json(error);
-    }
-
-    const buffer = Buffer.from(await data.arrayBuffer());
-
-    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
-    res.send(buffer);
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-
-});
-
-/* ==============================
+/* ===============================
    SERVER
-============================== */
+=============================== */
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log("Server running on http://localhost:3000");
+  console.log("Server running on port " + PORT);
 });
