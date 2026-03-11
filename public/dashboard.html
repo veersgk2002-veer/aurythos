@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<title>Aurythos Vault</title>
+
+<style>
+
+body{
+font-family:Arial;
+background:#f0f0f0;
+padding:20px;
+}
+
+#dropzone{
+border:2px dashed #888;
+border-radius:10px;
+padding:40px;
+text-align:center;
+background:white;
+margin-bottom:20px;
+}
+
+#progress{
+width:100%;
+background:#ddd;
+border-radius:5px;
+margin-top:10px;
+}
+
+#bar{
+width:0%;
+height:12px;
+background:#4caf50;
+border-radius:5px;
+}
+
+#files{
+display:flex;
+flex-wrap:wrap;
+}
+
+.file{
+background:white;
+padding:10px;
+margin:10px;
+border-radius:8px;
+box-shadow:0 0 6px rgba(0,0,0,0.2);
+width:230px;
+}
+
+.preview{
+width:100%;
+height:150px;
+display:flex;
+align-items:center;
+justify-content:center;
+background:#ddd;
+border-radius:6px;
+margin-bottom:8px;
+font-size:40px;
+}
+
+button{
+width:100%;
+margin-top:5px;
+padding:6px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h2>Your Vault</h2>
+
+<div id="dropzone">
+Drag & Drop File Here<br><br>
+<input type="file" id="file">
+<button onclick="upload()">Upload</button>
+
+<div id="progress">
+<div id="bar"></div>
+</div>
+
+</div>
+
+<h3>Your Files</h3>
+
+<div id="files">Loading...</div>
+
+<script>
+
+const token = localStorage.getItem("token")
+
+if(!token){
+alert("Login again")
+window.location="/"
+}
+
+async function loadFiles(){
+
+const res = await fetch("/files",{
+headers:{Authorization:"Bearer "+token}
+})
+
+const data = await res.json()
+
+const container=document.getElementById("files")
+
+container.innerHTML=""
+
+if(!data.files || data.files.length===0){
+container.innerHTML="No files yet"
+return
+}
+
+data.files.forEach(name=>{
+
+const div=document.createElement("div")
+div.className="file"
+
+const previewHTML=`<div class="preview">📁</div>`
+
+div.innerHTML=`
+${previewHTML}
+<div style="font-size:12px;word-break:break-all">${name}</div>
+<button onclick="downloadFile('${name}')">Download</button>
+<button onclick="deleteFile('${name}')">Delete</button>
+`
+
+container.appendChild(div)
+
+})
+
+}
+
+function upload(){
+
+const file=document.getElementById("file").files[0]
+
+if(!file){
+alert("Choose file first")
+return
+}
+
+const form=new FormData()
+form.append("file",file)
+
+const xhr = new XMLHttpRequest()
+
+xhr.open("POST","/upload")
+
+xhr.setRequestHeader("Authorization","Bearer "+token)
+
+xhr.upload.onprogress=function(e){
+
+const percent = (e.loaded/e.total)*100
+document.getElementById("bar").style.width = percent+"%"
+
+}
+
+xhr.onload=function(){
+
+document.getElementById("bar").style.width="0%"
+loadFiles()
+
+}
+
+xhr.send(form)
+
+}
+
+function downloadFile(name){
+window.open("/download/"+name)
+}
+
+async function deleteFile(name){
+
+await fetch("/delete/"+name,{
+method:"DELETE",
+headers:{Authorization:"Bearer "+token}
+})
+
+loadFiles()
+
+}
+
+const dropzone=document.getElementById("dropzone")
+
+dropzone.addEventListener("dragover",(e)=>{
+e.preventDefault()
+})
+
+dropzone.addEventListener("drop",(e)=>{
+
+e.preventDefault()
+
+const file=e.dataTransfer.files[0]
+
+const input=document.getElementById("file")
+
+input.files=e.dataTransfer.files
+
+upload()
+
+})
+
+loadFiles()
+
+</script>
+
+</body>
+
+</html>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Aurythos Vault</title>
+<style>
+body{
+font-family:Arial;
+background:#f0f0f0;
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+}
+
+.box{
+background:white;
+padding:30px;
+border-radius:10px;
+box-shadow:0 0 10px rgba(0,0,0,0.2);
+width:300px;
+text-align:center;
+}
+
+input{
+width:100%;
+padding:10px;
+margin:10px 0;
+}
+
+button{
+width:100%;
+padding:10px;
+margin-top:5px;
+}
+
+#msg{
+margin-top:10px;
+color:green;
+}
+</style>
+</head>
+
+<body>
+
+<div class="box">
+
+<h2>Aurythos Vault</h2>
+
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
+
+<button onclick="register()">Register</button>
+<button onclick="login()">Login</button>
+
+<div id="msg"></div>
+
+</div>
+
+<script>
+
+async function register(){
+
+const email=document.getElementById("email").value
+const password=document.getElementById("password").value
+
+const res = await fetch("/register",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({email,password})
+})
+
+const data = await res.json()
+
+document.getElementById("msg").innerText=data.message
+
+}
+
+async function login(){
+
+const email=document.getElementById("email").value
+const password=document.getElementById("password").value
+
+const res = await fetch("/login",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({email,password})
+})
+
+const data = await res.json()
+
+if(data.token){
+localStorage.setItem("token",data.token)
+window.location="/dashboard.html"
+}else{
+document.getElementById("msg").innerText=data.message
+}
+
+}
+
+</script>
+
+</body>
+</html>
