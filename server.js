@@ -411,4 +411,5 @@ const start = (p)=>{
     });
 };
 
-start(3000);
+const PORT = process.env.PORT || 3000;
+start(PORT);
