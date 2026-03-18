@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Vault</title>
+<style>
+body {
+    background:#0a192f;
+    color:white;
+    font-family:Arial;
+    padding:20px;
+}
+.container {
+    max-width:500px;
+    margin:auto;
+}
+.card {
+    background:#1b3a5a;
+    padding:12px;
+    margin:10px 0;
+    border-radius:10px;
+}
+button {
+    padding:6px 10px;
+    margin-top:5px;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<h2>Your Vault</h2>
+
+<input type="file" id="file">
+<button onclick="upload()">Upload</button>
+
+<h3>Your Files</h3>
+<div id="files"></div>
+
+<button onclick="logout()">Logout</button>
+
+</div>
+
+<script>
+const token = localStorage.getItem("token");
+
+if(!token){
+alert("Login first");
+location="index.html";
+}
+
+function upload(){
+const f=document.getElementById("file").files[0];
+const form=new FormData();
+form.append("file",f);
+
+fetch("/upload",{method:"POST",headers:{authorization:token},body:form})
+.then(r=>r.text())
+.then(()=>{
+alert("Uploaded");
+loadFiles();
+});
+}
+
+function loadFiles(){
+fetch("/files",{headers:{authorization:token}})
+.then(r=>r.json())
+.then(data=>{
+const div=document.getElementById("files");
+div.innerHTML="";
+data.forEach(file=>{
+div.innerHTML+=`
+<div class="card">
+${file}<br>
+<a href="/download/${file}" style="color:#4da6ff">Download</a>
+</div>`;
+});
+});
+}
+
+function logout(){
+localStorage.removeItem("token");
+location="index.html";
+}
+
+loadFiles();
+</script>
+
+</body>
+</html>
