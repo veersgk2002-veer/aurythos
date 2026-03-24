@@ -2,6 +2,7 @@ const express = require("express");
 const session = require("express-session");
 const multer = require("multer");
 const fs = require("fs");
+const path = require("path");
 const bcrypt = require("bcrypt");
 const Razorpay = require("razorpay");
 
@@ -42,9 +43,10 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// ===== TEMP DB =====
+// ===== TEMP DATABASE =====
 let users = {};
 let plans = {};
+let fileCount = {}; // 🔥 NEW
 
 // ===== AUTH =====
 function auth(req, res, next) {
@@ -67,6 +69,7 @@ app.post("/register", async (req, res) => {
 
   users[username] = await bcrypt.hash(password, 10);
   plans[username] = "free";
+  fileCount[username] = 0; // 🔥 INIT
 
   req.session.user = username;
   res.redirect("/dashboard");
@@ -89,7 +92,9 @@ app.post("/login", async (req, res) => {
 app.get("/dashboard", auth, (req, res) => {
   const user = req.session.user;
   const dir = `uploads/${user}`;
+
   let files = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+  fileCount[user] = files.length;
 
   res.send(`
 <!DOCTYPE html>
@@ -129,6 +134,25 @@ body {
   color:black;
   padding:5px 10px;
   border-radius:8px;
+}
+
+.storage {
+  margin-top:10px;
+  font-size:14px;
+}
+
+.bar {
+  height:8px;
+  background:#333;
+  border-radius:5px;
+  margin-top:5px;
+}
+
+.fill {
+  height:8px;
+  background:#00c6ff;
+  width:${(fileCount[user]/5)*100}%;
+  border-radius:5px;
 }
 
 button {
@@ -178,6 +202,11 @@ button {
   <div class="plan">${plans[user]}</div>
 </div>
 
+<div class="storage">
+  Storage: ${fileCount[user]}/5
+  <div class="bar"><div class="fill"></div></div>
+</div>
+
 <form action="/upload" method="post" enctype="multipart/form-data">
   <input type="file" name="files" multiple required>
   <button>Upload Files</button>
@@ -208,14 +237,17 @@ ${files.length === 0 ? "No files" : files.map(f => `
 `);
 });
 
-// UPLOAD
+// UPLOAD (LIMIT FIXED)
 app.post("/upload", auth, upload.array("files"), (req, res) => {
   const user = req.session.user;
   const dir = `uploads/${user}`;
   const files = fs.readdirSync(dir);
 
-  if (plans[user] === "free" && files.length > 3) {
-    return res.send("Limit reached. Upgrade.");
+  if (files.length >= 5) {
+    return res.send(`
+      <h2 style="color:red;text-align:center;">Limit reached (5 max)</h2>
+      <div style="text-align:center;"><a href="/dashboard">Go Back</a></div>
+    `);
   }
 
   res.redirect("/dashboard");
@@ -258,11 +290,13 @@ rzp.open();
 `);
 });
 
+// SUCCESS
 app.get("/success", auth, (req, res) => {
   plans[req.session.user] = "premium";
   res.redirect("/dashboard");
 });
 
+// LOGOUT
 app.get("/logout", (req, res) => {
   req.session.destroy(() => res.redirect("/"));
 });
