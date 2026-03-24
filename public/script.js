@@ -1,4 +1,5 @@
-alert("NEW JS LOADED");
+alert("NEW JS LOADED"); // 🔥 MUST SHOW
+
 async function login() {
   let res = await fetch("/login", {
     method: "POST",
@@ -39,7 +40,6 @@ function toggleRegister() {
     registerBox.style.display === "none" ? "block" : "none";
 }
 
-// 🔥 IMPORTANT FIX HERE
 async function loadFiles() {
   let res = await fetch("/files");
   let files = await res.json();
@@ -58,7 +58,8 @@ async function loadFiles() {
 
       <button onclick="del(${f.id})">Delete</button> |
 
-      <button onclick="share(${f.id})" style="background:#00d4ff;border:none;padding:5px 10px;border-radius:5px;cursor:pointer;">
+      <button onclick="share(${f.id})"
+        style="background:#00d4ff;border:none;padding:5px 10px;border-radius:5px;">
         Share
       </button>
     </div>
@@ -70,14 +71,10 @@ async function upload() {
   let form = new FormData();
   for (let f of files.files) form.append("files", f);
 
-  let res = await fetch("/upload", {
-    method:"POST",
-    body: form
-  });
-
+  let res = await fetch("/upload", { method:"POST", body: form });
   let data = await res.json();
-  alert(data.error || data.success);
 
+  alert(data.error || data.success);
   loadFiles();
 }
 
@@ -87,31 +84,24 @@ async function del(id) {
     headers: {"Content-Type":"application/json"},
     body: JSON.stringify({ id })
   });
-
   loadFiles();
 }
 
-// 🔥 SHARE FUNCTION (IMPORTANT)
 async function share(id) {
   let toUser = prompt("Enter username to share:");
-
   if (!toUser) return;
 
   let res = await fetch("/share", {
     method:"POST",
     headers: {"Content-Type":"application/json"},
-    body: JSON.stringify({
-      id: id,
-      toUser: toUser
-    })
+    body: JSON.stringify({ id, toUser })
   });
 
   let data = await res.json();
-
   alert(data.error || data.success);
 }
 
 async function upgrade() {
   await fetch("/upgrade", { method:"POST" });
-  alert("Upgraded to Premium 🚀");
+  alert("Upgraded 🚀");
 }

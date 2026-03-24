@@ -4,38 +4,41 @@
 <title>Aurythos Vault</title>
 <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
 <div id="authBox">
-<h2>Aurythos Vault</h2>
+  <h2>Aurythos Vault</h2>
 
-<input id="username" placeholder="Username">
-<input id="password" placeholder="Password" type="password">
+  <input id="username" placeholder="Username">
+  <input id="password" type="password" placeholder="Password">
 
-<button onclick="login()">Login</button>
-<p id="msg"></p>
+  <button onclick="login()">Login</button>
+  <p id="msg"></p>
 
-<p onclick="toggleRegister()">New user? Register</p>
+  <p onclick="toggleRegister()">New user? Register</p>
 
-<div id="registerBox" style="display:none;">
-<input id="ruser" placeholder="Username">
-<input id="rpass" placeholder="Password">
-<button onclick="register()">Register</button>
-</div>
+  <div id="registerBox" style="display:none;">
+    <input id="ruser" placeholder="Username">
+    <input id="rpass" placeholder="Password">
+    <button onclick="register()">Register</button>
+  </div>
 </div>
 
 <div id="vault" style="display:none;">
-<h2>Your Vault</h2>
+  <h2>Your Vault</h2>
 
-<input type="file" id="files" multiple>
-<button onclick="upload()">Upload</button>
-<button onclick="upgrade()">Upgrade ₹99</button>
+  <input type="file" id="files" multiple>
+  <button onclick="upload()">Upload Files</button>
+  <button onclick="upgrade()">Upgrade ₹99</button>
 
-<p id="limit"></p>
+  <p id="limit"></p>
 
-<div id="fileList"></div>
+  <div id="fileList"></div>
 </div>
 
-<script src="script.js"></script>
+<!-- 🔥 FORCE NEW JS LOAD -->
+<script src="/script.js?v=999"></script>
+
 </body>
 </html>
