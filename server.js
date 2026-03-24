@@ -4,24 +4,28 @@ const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 const { v4: uuidv4 } = require("uuid");
 
 const app = express();
 
-// ====== CONFIG ======
+// ===== CONFIG =====
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static("public"));
 
 app.use(session({
-  secret: "secret123",
+  secret: "supersecret",
   resave: false,
   saveUninitialized: false
 }));
 
-// ====== STORAGE ======
-if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
+// ===== ENSURE UPLOAD FOLDER =====
+if (!fs.existsSync("uploads")) {
+  fs.mkdirSync("uploads");
+}
 
+// ===== STORAGE =====
 const storage = multer.diskStorage({
   destination: "uploads/",
   filename: (req, file, cb) => {
@@ -31,17 +35,36 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// ====== DATABASE (TEMP MEMORY) ======
+// ===== TEMP DATABASE =====
 let users = {};
 let filesDB = {};
 
-// ====== AUTH ======
+// ===== AUTH =====
 function auth(req, res, next) {
   if (!req.session.user) return res.redirect("/");
   next();
 }
 
-// ====== ROUTES ======
+// ===== ENCRYPTION (FIXED) =====
+function getKey(username) {
+  return crypto.createHash("sha256")
+    .update(username + "_vault_secret")
+    .digest();
+}
+
+function encrypt(buffer, key) {
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
+
+  const encrypted = Buffer.concat([
+    cipher.update(buffer),
+    cipher.final()
+  ]);
+
+  return iv.toString("hex") + ":" + encrypted.toString("hex");
+}
+
+// ===== ROUTES =====
 
 // REGISTER
 app.post("/register", async (req, res) => {
@@ -72,28 +95,44 @@ app.post("/login", async (req, res) => {
   res.redirect("/dashboard.html");
 });
 
-// DASHBOARD DATA
+// GET FILES
 app.get("/files", auth, (req, res) => {
-  const username = req.session.user;
-  res.json(filesDB[username] || []);
+  res.json(filesDB[req.session.user] || []);
 });
 
-// UPLOAD
+// UPLOAD (FIXED)
 app.post("/upload", auth, upload.array("files"), (req, res) => {
-  const username = req.session.user;
+  try {
+    const username = req.session.user;
+    const key = getKey(username);
 
-  if (!filesDB[username]) filesDB[username] = [];
+    if (!req.files || req.files.length === 0) {
+      return res.send("No files");
+    }
 
-  req.files.forEach(file => {
-    filesDB[username].push({
-      id: uuidv4(),
-      name: file.originalname,
-      path: file.path,
-      size: file.size
+    if (!filesDB[username]) filesDB[username] = [];
+
+    req.files.forEach(file => {
+      const buffer = fs.readFileSync(file.path);
+
+      const encrypted = encrypt(buffer, key);
+
+      fs.writeFileSync(file.path, encrypted);
+
+      filesDB[username].push({
+        id: uuidv4(),
+        name: file.originalname,
+        path: file.path,
+        size: file.size
+      });
     });
-  });
 
-  res.redirect("/dashboard.html");
+    res.redirect("/dashboard.html");
+
+  } catch (err) {
+    console.error(err);
+    res.send("Upload failed");
+  }
 });
 
 // DOWNLOAD
@@ -109,30 +148,36 @@ app.get("/download/:id", auth, (req, res) => {
 // DELETE
 app.get("/delete/:id", auth, (req, res) => {
   const username = req.session.user;
-  const fileIndex = filesDB[username].findIndex(f => f.id === req.params.id);
+  const index = filesDB[username].findIndex(f => f.id === req.params.id);
 
-  if (fileIndex === -1) return res.send("File not found");
+  if (index === -1) return res.send("Not found");
 
-  const file = filesDB[username][fileIndex];
+  const file = filesDB[username][index];
 
-  fs.unlinkSync(file.path);
-  filesDB[username].splice(fileIndex, 1);
+  if (fs.existsSync(file.path)) {
+    fs.unlinkSync(file.path);
+  }
+
+  filesDB[username].splice(index, 1);
 
   res.redirect("/dashboard.html");
 });
 
 // SHARE
 app.get("/share/:id", (req, res) => {
-  let file;
+  let found;
 
-  for (let user in filesDB) {
-    file = filesDB[user].find(f => f.id === req.params.id);
-    if (file) break;
+  for (let u in filesDB) {
+    const f = filesDB[u].find(x => x.id === req.params.id);
+    if (f) {
+      found = f;
+      break;
+    }
   }
 
-  if (!file) return res.send("Not found");
+  if (!found) return res.send("Not found");
 
-  res.download(file.path, file.name);
+  res.download(found.path, found.name);
 });
 
 // LOGOUT
@@ -141,5 +186,10 @@ app.get("/logout", (req, res) => {
   res.redirect("/");
 });
 
-// START
-app.listen(10000, () => console.log("Server running"));
+// ===== START =====
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log("Server running on " + PORT));
+
+// ===== ERROR DEBUG =====
+process.on("uncaughtException", err => console.error(err));
+process.on("unhandledRejection", err => console.error(err));

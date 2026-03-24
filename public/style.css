@@ -7,23 +7,24 @@ body {
 
 .card {
   background: #23474d;
-  padding: 20px;
+  padding: 25px;
   margin: 100px auto;
-  width: 300px;
-  border-radius: 10px;
+  width: 320px;
+  border-radius: 12px;
 }
 
 input {
-  width: 90%;
-  margin: 5px;
-  padding: 8px;
+  width: 95%;
+  margin: 8px;
+  padding: 10px;
 }
 
 button {
   width: 95%;
-  padding: 8px;
-  margin: 5px;
+  padding: 10px;
+  margin: 8px;
   background: #00bcd4;
   border: none;
   color: white;
+  cursor: pointer;
 }

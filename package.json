@@ -1,30 +1,15 @@
 {
   "name": "aurythos-vault",
-  "version": "4.0.0",
+  "version": "1.0.0",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.100.0",
-    "bcryptjs": "^3.0.3",
-    "crypto": "^1.0.1",
-    "express": "^4.22.1",
-    "express-fileupload": "^1.5.2",
-    "express-session": "^1.19.0",
-    "multer": "^2.1.1"
-  },
-  "description": "",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/veersgk2002-coder/aurythos-vault.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/veersgk2002-coder/aurythos-vault/issues"
-  },
-  "homepage": "https://github.com/veersgk2002-coder/aurythos-vault#readme"
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "multer": "^1.4.5-lts.1",
+    "bcrypt": "^5.1.0",
+    "uuid": "^9.0.1"
+  }
 }
