@@ -1,26 +1,29 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Vault</title>
-<link rel="stylesheet" href="style.css">
+  <title>Aurythos Vault</title>
+  <style>
+    body { background:#0e2a30; display:flex; justify-content:center; align-items:center; height:100vh; }
+    .box { background:#1f3d44; padding:30px; border-radius:10px; width:300px; text-align:center; }
+    input, button { width:90%; margin:10px; padding:10px; }
+  </style>
 </head>
 <body>
 
-<div class="card">
-<h2>Aurythos Vault</h2>
+<div class="box">
+  <h2>Aurythos Vault</h2>
 
-<form action="/login" method="POST">
-<input name="username" placeholder="Username" required>
-<input name="password" type="password" placeholder="Password" required>
-<button>Login</button>
-</form>
+  <form action="/login" method="post">
+    <input name="username" placeholder="Username" required>
+    <input name="password" type="password" placeholder="Password" required>
+    <button>Login</button>
+  </form>
 
-<form action="/register" method="POST">
-<input name="username" placeholder="Username" required>
-<input name="password" type="password" placeholder="Password" required>
-<button>Register</button>
-</form>
-
+  <form action="/register" method="post">
+    <input name="username" placeholder="Username" required>
+    <input name="password" type="password" placeholder="Password" required>
+    <button>Register</button>
+  </form>
 </div>
 
 </body>
