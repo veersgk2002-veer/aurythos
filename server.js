@@ -42,7 +42,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// ===== DATABASE (TEMP MEMORY) =====
+// ===== TEMP DB =====
 let users = {};
 let plans = {};
 
@@ -89,7 +89,6 @@ app.post("/login", async (req, res) => {
 app.get("/dashboard", auth, (req, res) => {
   const user = req.session.user;
   const dir = `uploads/${user}`;
-
   let files = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
 
   res.send(`
@@ -118,13 +117,11 @@ body {
   padding:20px;
   border-radius:15px;
   backdrop-filter: blur(10px);
-  box-shadow:0 0 20px rgba(0,0,0,0.3);
 }
 
 .top {
   display:flex;
   justify-content:space-between;
-  align-items:center;
 }
 
 .plan {
@@ -132,7 +129,6 @@ body {
   color:black;
   padding:5px 10px;
   border-radius:8px;
-  font-size:12px;
 }
 
 button {
@@ -141,8 +137,6 @@ button {
   border:none;
   border-radius:8px;
   background:#00c6ff;
-  color:black;
-  font-weight:bold;
   margin-top:10px;
 }
 
@@ -156,9 +150,9 @@ button {
 }
 
 .file a {
-  margin-left:10px;
   color:#00c6ff;
   font-size:12px;
+  margin-left:8px;
 }
 
 .upgrade {
@@ -180,7 +174,7 @@ button {
 <div class="card">
 
 <div class="top">
-  <h3>${user}</h3>
+  <b>${user}</b>
   <div class="plan">${plans[user]}</div>
 </div>
 
@@ -214,7 +208,7 @@ ${files.length === 0 ? "No files" : files.map(f => `
 `);
 });
 
-// UPLOAD (LIMIT CONTROL)
+// UPLOAD
 app.post("/upload", auth, upload.array("files"), (req, res) => {
   const user = req.session.user;
   const dir = `uploads/${user}`;
@@ -264,13 +258,11 @@ rzp.open();
 `);
 });
 
-// SUCCESS
 app.get("/success", auth, (req, res) => {
   plans[req.session.user] = "premium";
   res.redirect("/dashboard");
 });
 
-// LOGOUT
 app.get("/logout", (req, res) => {
   req.session.destroy(() => res.redirect("/"));
 });
