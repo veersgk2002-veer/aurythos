@@ -34,7 +34,23 @@ async function register() {
   let data = await res.json();
   msg.innerText = data.error || data.success;
 }
+// ===== SHARE BUTTON FUNCTION =====
 
+function shareFile(url) {
+  if (navigator.share) {
+    navigator.share({
+      title: "My File",
+      text: "Check this file",
+      url: url
+    })
+    .then(() => console.log("Shared"))
+    .catch(err => console.log(err));
+  } else {
+    // fallback
+    navigator.clipboard.writeText(url);
+    alert("Link copied!");
+  }
+}
 function toggleRegister() {
   registerBox.style.display =
     registerBox.style.display === "none" ? "block" : "none";
@@ -104,15 +120,4 @@ async function share(id) {
 async function upgrade() {
   await fetch("/upgrade", { method:"POST" });
   alert("Upgraded 🚀");
-}
-// ✅ SHARE FILE FUNCTION
-function shareFile(fileId) {
-    const link = `${window.location.origin}/share/${fileId}`;
-    
-    // Copy to clipboard
-    navigator.clipboard.writeText(link).then(() => {
-        alert("Share link copied:\n" + link);
-    }).catch(() => {
-        prompt("Copy this link:", link);
-    });
 }
