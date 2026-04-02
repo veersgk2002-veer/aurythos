@@ -30,8 +30,7 @@ fetch("/files",{headers:{Authorization:token}})
   data.forEach(f=>{
     div.innerHTML += `
     <div class="file">
-      ${f.original}
-      <br>
+      ${f.original}<br>
       <button onclick="download('${f.filename}')">Download</button>
       <button onclick="del('${f.filename}')">Delete</button>
       <button onclick="share('${f.filename}')">Share</button>
@@ -53,7 +52,17 @@ function upload(){
 }
 
 function download(name){
-  window.open("/download/"+name+"?token="+token);
+  fetch("/download/"+name,{
+    headers:{Authorization:token}
+  })
+  .then(res=>res.blob())
+  .then(blob=>{
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+  });
 }
 
 function del(name){
@@ -72,7 +81,7 @@ function share(name){
       Authorization:token
     },
     body: JSON.stringify({filename:name,toUser:user})
-  });
+  }).then(()=>load());
 }
 
 function logout(){
