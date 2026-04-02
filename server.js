@@ -1,208 +1,225 @@
 const express = require("express");
-const multer = require("multer");
-const axios = require("axios");
-const crypto = require("crypto");
-const cloudinary = require("cloudinary").v2;
+const session = require("express-session");
+const fileUpload = require("express-fileupload");
+const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
 
 const app = express();
 
 // ===== MIDDLEWARE =====
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(fileUpload());
 
-// 👉 SERVE FRONTEND
+app.use(session({
+  secret: "aurythos_secret_key",
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 24 * 60 * 60 * 1000 }
+}));
+
 app.use(express.static("public"));
 
-// ===== CONFIG =====
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
+// ===== INIT =====
+if (!fs.existsSync("uploads")) fs.mkdirSync("uploads");
+if (!fs.existsSync("users.json")) fs.writeFileSync("users.json", "{}");
 
-cloudinary.config({
-  cloud_name: process.env.CLOUD_NAME,
-  api_key: process.env.API_KEY,
-  api_secret: process.env.API_SECRET,
-});
+// ===== USER KEY GENERATION =====
+function generateUserKey(password) {
+  return crypto.createHash("sha256").update(password).digest();
+}
 
-const upload = multer({ storage: multer.memoryStorage() });
+// ===== ENCRYPT (AES-256-GCM) =====
+function encrypt(buffer, key) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
 
-// ===== HEALTH CHECK =====
-app.get("/health", (req, res) => {
-  res.send("Aurythos running 🚀");
-});
+  const encrypted = Buffer.concat([cipher.update(buffer), cipher.final()]);
+  const tag = cipher.getAuthTag();
+
+  return Buffer.concat([iv, tag, encrypted]);
+}
+
+// ===== DECRYPT =====
+function decrypt(buffer, key) {
+  const iv = buffer.slice(0, 12);
+  const tag = buffer.slice(12, 28);
+  const encrypted = buffer.slice(28);
+
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(tag);
+
+  return Buffer.concat([decipher.update(encrypted), decipher.final()]);
+}
 
 // ===== REGISTER =====
 app.post("/register", async (req, res) => {
   const { username, password } = req.body;
 
-  const salt = crypto.randomBytes(16).toString("hex");
-  const hashed = crypto.pbkdf2Sync(password, salt, 1000, 64, "sha512").toString("hex");
+  const users = JSON.parse(fs.readFileSync("users.json"));
 
-  await axios.post(`${SUPABASE_URL}/rest/v1/users`, {
-    username,
-    password: hashed,
-    salt
-  }, {
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`
-    }
-  });
+  if (users[username]) return res.send("User exists");
 
-  res.json({ success: true });
+  const hashed = await bcrypt.hash(password, 10);
+
+  users[username] = {
+    password: hashed
+  };
+
+  fs.writeFileSync("users.json", JSON.stringify(users, null, 2));
+
+  fs.mkdirSync("./uploads/" + username, { recursive: true });
+
+  req.session.user = username;
+  req.session.key = generateUserKey(password);
+
+  res.redirect("/vault");
 });
 
 // ===== LOGIN =====
-let currentUser = null;
-
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
 
-  const user = await axios.get(`${SUPABASE_URL}/rest/v1/users?username=eq.${username}`, {
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`
-    }
-  });
+  const users = JSON.parse(fs.readFileSync("users.json"));
 
-  if (!user.data.length) return res.json({ error: "User not found" });
+  if (!users[username]) return res.send("User not found");
 
-  const db = user.data[0];
-  const hashed = crypto.pbkdf2Sync(password, db.salt, 1000, 64, "sha512").toString("hex");
+  const match = await bcrypt.compare(password, users[username].password);
 
-  if (hashed !== db.password) return res.json({ error: "Wrong password" });
+  if (!match) return res.send("Wrong password");
 
-  currentUser = username;
-  res.json({ success: true });
+  req.session.user = username;
+  req.session.key = generateUserKey(password);
+
+  res.redirect("/vault");
 });
 
-// ===== UPLOAD =====
-app.post("/upload", upload.array("files"), async (req, res) => {
-  if (!currentUser) return res.json({ error: "Login required" });
+// ===== VAULT =====
+app.get("/vault", (req, res) => {
+  if (!req.session.user) return res.redirect("/");
+  res.sendFile(__dirname + "/public/vault.html");
+});
+
+// ===== FILE LIST =====
+app.get("/files", (req, res) => {
+  if (!req.session.user) return res.json([]);
+
+  const dir = "./uploads/" + req.session.user;
+  if (!fs.existsSync(dir)) return res.json([]);
+
+  res.json(fs.readdirSync(dir));
+});
+
+// ===== UPLOAD (ENCRYPTED PER USER) =====
+app.post("/upload", (req, res) => {
+  if (!req.session.user) return res.redirect("/");
+
+  const key = req.session.key;
+
+  if (!req.files) return res.redirect("/vault");
+
+  const files = Array.isArray(req.files.file)
+    ? req.files.file
+    : [req.files.file];
+
+  files.forEach(f => {
+    const encrypted = encrypt(f.data, key);
+
+    fs.writeFileSync(
+      "./uploads/" + req.session.user + "/" + f.name,
+      encrypted
+    );
+  });
+
+  res.redirect("/vault");
+});
+
+// ===== PREVIEW (PRO LEVEL) =====
+app.get("/preview/:name", (req, res) => {
+  if (!req.session.user) return res.sendStatus(401);
+
+  const key = req.session.key;
+  const fileName = decodeURIComponent(req.params.name);
+
+  const filePath = path.join(__dirname, "uploads", req.session.user, fileName);
+
+  if (!fs.existsSync(filePath)) return res.send("File not found");
 
   try {
-    for (let file of req.files) {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        { resource_type: "auto" },
-        async (err, result) => {
-          if (err) return console.error(err);
+    const encrypted = fs.readFileSync(filePath);
+    const decrypted = decrypt(encrypted, key);
 
-          await axios.post(`${SUPABASE_URL}/rest/v1/files`, {
-            username: currentUser,
-            file_name: file.originalname,
-            file_url: result.secure_url,
-            size: file.size
-          }, {
-            headers: {
-              apikey: SUPABASE_KEY,
-              Authorization: `Bearer ${SUPABASE_KEY}`
-            }
-          });
-        }
-      );
-
-      uploadStream.end(file.buffer);
+    // detect type
+    if (fileName.endsWith(".pdf")) {
+      res.setHeader("Content-Type", "application/pdf");
+    } else if (fileName.match(/\.(jpg|jpeg|png)$/)) {
+      res.setHeader("Content-Type", "image/jpeg");
+    } else {
+      res.setHeader("Content-Type", "application/octet-stream");
     }
 
-    res.json({ success: true });
-
+    res.send(decrypted);
   } catch (err) {
-    console.error(err);
-    res.json({ error: "Upload failed" });
+    res.send("Preview failed (wrong key or corrupted file)");
   }
 });
 
-// ===== GET FILES =====
-app.get("/files", async (req, res) => {
-  if (!currentUser) return res.json([]);
+// ===== DOWNLOAD =====
+app.get("/download/:name", (req, res) => {
+  if (!req.session.user) return res.redirect("/");
 
-  const files = await axios.get(
-    `${SUPABASE_URL}/rest/v1/files?username=eq.${currentUser}`,
-    {
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`
-      }
-    }
-  );
+  const key = req.session.key;
+  const fileName = decodeURIComponent(req.params.name);
 
-  res.json(files.data);
+  const filePath = "./uploads/" + req.session.user + "/" + fileName;
+
+  const encrypted = fs.readFileSync(filePath);
+  const decrypted = decrypt(encrypted, key);
+
+  res.setHeader("Content-Disposition", "attachment; filename=" + fileName);
+  res.send(decrypted);
 });
 
 // ===== DELETE =====
-app.post("/delete", async (req, res) => {
-  const { id } = req.body;
+app.get("/delete/:name", (req, res) => {
+  if (!req.session.user) return res.redirect("/");
 
-  await axios.delete(`${SUPABASE_URL}/rest/v1/files?id=eq.${id}`, {
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`
-    }
-  });
+  const file = "./uploads/" + req.session.user + "/" + decodeURIComponent(req.params.name);
+
+  if (fs.existsSync(file)) fs.unlinkSync(file);
+
+  res.redirect("/vault");
+});
+
+// ===== SHARE (USER → USER ENCRYPTED TRANSFER) =====
+app.post("/send", (req, res) => {
+  if (!req.session.user) return res.json({ success: false });
+
+  const { toUser, fileName } = req.body;
+
+  const users = JSON.parse(fs.readFileSync("users.json"));
+
+  if (!users[toUser]) {
+    return res.json({ success: false, message: "User not found" });
+  }
+
+  const srcPath = "./uploads/" + req.session.user + "/" + fileName;
+  const destPath = "./uploads/" + toUser + "/" + fileName;
+
+  fs.copyFileSync(srcPath, destPath);
 
   res.json({ success: true });
 });
 
-// ===== SHARE =====
-app.post("/share", async (req, res) => {
-  const { id, toUser } = req.body;
-
-  try {
-    // check user exists
-    const userCheck = await axios.get(
-      `${SUPABASE_URL}/rest/v1/users?username=eq.${toUser}`,
-      {
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`
-        }
-      }
-    );
-
-    if (!userCheck.data.length) {
-      return res.json({ error: "User not found" });
-    }
-
-    // get file
-    const file = await axios.get(
-      `${SUPABASE_URL}/rest/v1/files?id=eq.${id}`,
-      {
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`
-        }
-      }
-    );
-
-    const f = file.data[0];
-
-    // duplicate file for new user
-    await axios.post(
-      `${SUPABASE_URL}/rest/v1/files`,
-      {
-        username: toUser,
-        file_name: f.file_name,
-        file_url: f.file_url,
-        size: f.size
-      },
-      {
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`
-        }
-      }
-    );
-
-    res.json({ success: true });
-
-  } catch (err) {
-    console.error(err);
-    res.json({ error: "Share failed" });
-  }
+// ===== LOGOUT =====
+app.get("/logout", (req, res) => {
+  req.session.destroy(() => res.redirect("/"));
 });
 
-// ===== START SERVER =====
-const PORT = process.env.PORT || 3000;
+// ===== START =====
+const PORT = process.env.PORT || 4000;
 
 app.listen(PORT, () => {
   console.log("Server running on port " + PORT);

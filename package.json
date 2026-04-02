@@ -1,17 +1,30 @@
 {
-  "name": "vault",
+  "name": "aurythos",
   "version": "1.0.0",
   "main": "server.js",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "express": "^4.22.1",
+    "express-fileupload": "^1.5.2",
+    "express-session": "^1.19.0",
+    "multer": "^1.4.5-lts.1"
+  },
+  "description": "",
   "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
   },
-  "dependencies": {
-    "cloudinary": "^1.41.3",
-    "express": "^4.22.1",
-    "express-session": "^1.19.0",
-    "multer": "^1.4.5-lts.1",
-    "multer-storage-cloudinary": "^4.0.0",
-    "razorpay": "^2.9.6",
-    "uuid": "^13.0.0"
-  }
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/veersgk2002-coder/aurythos-vault.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/veersgk2002-coder/aurythos-vault/issues"
+  },
+  "homepage": "https://github.com/veersgk2002-coder/aurythos-vault#readme"
 }
