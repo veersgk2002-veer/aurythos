@@ -1,33 +1,18 @@
 const express = require("express");
-const session = require("express-session");
 const fileUpload = require("express-fileupload");
 const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcryptjs");
 const cors = require("cors");
+const crypto = require("crypto");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// ===== MIDDLEWARE =====
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(fileUpload());
 app.use(cors());
-
-app.set('trust proxy', 1);
-
-app.use(session({
-  secret: "aurythos_secret",
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: true,
-    httpOnly: true,
-    sameSite: "lax"
-  }
-}));
-
 app.use(express.static("public"));
 
 // ===== FILES =====
@@ -55,9 +40,10 @@ function saveFiles(data) {
   fs.writeFileSync(FILES_FILE, JSON.stringify(data, null, 2));
 }
 
-// ===== ROUTES =====
+// ===== TOKEN STORAGE =====
+const sessions = {};
 
-// Register
+// ===== REGISTER =====
 app.post("/register", async (req, res) => {
   const { username, password } = req.body;
   const users = getUsers();
@@ -73,7 +59,7 @@ app.post("/register", async (req, res) => {
   res.redirect("/login.html");
 });
 
-// Login
+// ===== LOGIN (TOKEN BASED) =====
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
   const users = getUsers();
@@ -88,15 +74,29 @@ app.post("/login", async (req, res) => {
     return res.send("Wrong password");
   }
 
-  req.session.user = username;
+  const token = crypto.randomBytes(16).toString("hex");
+  sessions[token] = username;
 
-  res.redirect("/vault.html");
+  res.send(`
+    <script>
+      localStorage.setItem("token", "${token}");
+      window.location.href = "/vault.html";
+    </script>
+  `);
 });
 
-// Upload
-app.post("/upload", (req, res) => {
-  if (!req.session.user) return res.redirect("/login.html");
+// ===== AUTH MIDDLEWARE =====
+function auth(req, res, next) {
+  const token = req.headers["authorization"];
+  if (!token || !sessions[token]) {
+    return res.status(401).send("Unauthorized");
+  }
+  req.user = sessions[token];
+  next();
+}
 
+// ===== UPLOAD =====
+app.post("/upload", auth, (req, res) => {
   const file = req.files.file;
   const filePath = path.join("uploads", file.name);
 
@@ -104,47 +104,44 @@ app.post("/upload", (req, res) => {
 
   const files = getFiles();
 
-  if (!files[req.session.user]) {
-    files[req.session.user] = [];
+  if (!files[req.user]) {
+    files[req.user] = [];
   }
 
-  files[req.session.user].push(file.name);
+  files[req.user].push(file.name);
   saveFiles(files);
 
-  res.redirect("/vault.html");
+  res.send("Uploaded");
 });
 
-// List Files
-app.get("/files", (req, res) => {
-  if (!req.session.user) return res.json([]);
-
+// ===== LIST FILES =====
+app.get("/files", auth, (req, res) => {
   const files = getFiles();
-  res.json(files[req.session.user] || []);
+  res.json(files[req.user] || []);
 });
 
-// Download
-app.get("/download/:name", (req, res) => {
+// ===== DOWNLOAD =====
+app.get("/download/:name", auth, (req, res) => {
   const filePath = path.join(__dirname, "uploads", req.params.name);
   res.download(filePath);
 });
 
-// Delete
-app.get("/delete/:name", (req, res) => {
-  const username = req.session.user;
+// ===== DELETE =====
+app.get("/delete/:name", auth, (req, res) => {
   const fileName = req.params.name;
 
   const filePath = path.join("uploads", fileName);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
   const files = getFiles();
-  files[username] = (files[username] || []).filter(f => f !== fileName);
+  files[req.user] = (files[req.user] || []).filter(f => f !== fileName);
   saveFiles(files);
 
-  res.redirect("/vault.html");
+  res.send("Deleted");
 });
 
-// Share (User to User)
-app.post("/share", (req, res) => {
+// ===== SHARE =====
+app.post("/share", auth, (req, res) => {
   const { toUser, fileName } = req.body;
   const files = getFiles();
 
@@ -153,16 +150,19 @@ app.post("/share", (req, res) => {
 
   saveFiles(files);
 
-  res.redirect("/vault.html");
+  res.send("Shared");
 });
 
-// Logout
+// ===== LOGOUT =====
 app.get("/logout", (req, res) => {
-  req.session.destroy();
-  res.redirect("/login.html");
+  res.send(`
+    <script>
+      localStorage.removeItem("token");
+      window.location.href = "/login.html";
+    </script>
+  `);
 });
 
-// ===== START =====
 app.listen(PORT, () => {
   console.log("Server running on port", PORT);
 });
