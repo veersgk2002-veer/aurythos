@@ -1,6 +1,6 @@
 const express = require("express");
-const multer = require("multer");
 const fs = require("fs");
+const path = require("path");
 const bcrypt = require("bcryptjs");
 
 const app = express();
@@ -9,9 +9,8 @@ const PORT = process.env.PORT || 4000;
 app.use(express.json());
 app.use(express.static("public"));
 
-// simple database (file)
+// Load users
 let users = [];
-
 if (fs.existsSync("users.json")) {
     users = JSON.parse(fs.readFileSync("users.json"));
 }
@@ -24,17 +23,17 @@ app.post("/register", async (req, res) => {
         return res.json({ success: false, message: "Missing fields" });
     }
 
-    const exist = users.find(u => u.username === username);
-    if (exist) {
+    const exists = users.find(u => u.username === username);
+    if (exists) {
         return res.json({ success: false, message: "User exists" });
     }
 
     const hashed = await bcrypt.hash(password, 10);
 
     users.push({ username, password: hashed });
-    fs.writeFileSync("users.json", JSON.stringify(users));
+    fs.writeFileSync("users.json", JSON.stringify(users, null, 2));
 
-    res.json({ success: true });
+    res.json({ success: true, message: "Registered" });
 });
 
 // LOGIN
@@ -47,17 +46,16 @@ app.post("/login", async (req, res) => {
     }
 
     const match = await bcrypt.compare(password, user.password);
-
     if (!match) {
         return res.json({ success: false, message: "Wrong password" });
     }
 
-    res.json({ success: true });
+    res.json({ success: true, message: "Login success" });
 });
 
 // TEST
 app.get("/test", (req, res) => {
-    res.json({ message: "Server working ✅" });
+    res.send("Server working");
 });
 
 app.listen(PORT, () => {

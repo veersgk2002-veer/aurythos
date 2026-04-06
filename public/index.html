@@ -2,66 +2,61 @@
 <html>
 <head>
     <title>Aurythos Vault</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <style>
         body {
             margin: 0;
-            font-family: Arial;
-            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            font-family: Arial;
         }
 
-        .card {
+        .box {
             background: rgba(255,255,255,0.05);
             padding: 30px;
             border-radius: 15px;
+            width: 280px;
             text-align: center;
-            width: 300px;
-            backdrop-filter: blur(10px);
+            color: white;
         }
 
         h2 {
             color: #00eaff;
-            margin-bottom: 5px;
-        }
-
-        p {
-            color: #ccc;
-            margin-bottom: 20px;
         }
 
         input {
             width: 100%;
             padding: 10px;
-            margin: 10px 0;
+            margin: 8px 0;
             border-radius: 8px;
             border: none;
-            outline: none;
         }
 
         button {
-            padding: 10px 15px;
+            width: 48%;
+            padding: 10px;
             margin: 5px;
             border: none;
             border-radius: 8px;
-            background: #00eaff;
-            cursor: pointer;
+            background: #00c6ff;
+            color: black;
+            font-weight: bold;
         }
     </style>
 </head>
 
 <body>
 
-<div class="card">
+<div class="box">
     <h2>Aurythos</h2>
     <p>Secure Digital Vault</p>
 
-    <input id="username" placeholder="Username">
-    <input id="password" type="password" placeholder="Password">
+    <input id="user" placeholder="Username">
+    <input id="pass" type="password" placeholder="Password">
 
     <br>
 
@@ -71,31 +66,31 @@
 
 <script>
 async function register() {
-    const username = document.getElementById("username").value;
-    const password = document.getElementById("password").value;
+    const username = document.getElementById("user").value;
+    const password = document.getElementById("pass").value;
 
     const res = await fetch("/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify({ username, password })
     });
 
     const data = await res.json();
-    alert(JSON.stringify(data));
+    alert(data.message);
 }
 
 async function login() {
-    const username = document.getElementById("username").value;
-    const password = document.getElementById("password").value;
+    const username = document.getElementById("user").value;
+    const password = document.getElementById("pass").value;
 
     const res = await fetch("/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify({ username, password })
     });
 
     const data = await res.json();
-    alert(JSON.stringify(data));
+    alert(data.message);
 }
 </script>
 
