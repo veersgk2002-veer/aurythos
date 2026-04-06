@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Aurythos Vault</title>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #0f2027;
+      color: white;
+      font-family: Arial;
+      text-align: center;
+    }
+
+    h1 {
+      color: #00d4ff;
+    }
+
+    input {
+      margin: 10px;
+    }
+
+    button {
+      padding: 10px;
+      margin: 5px;
+      border: none;
+      border-radius: 8px;
+      background: #00d4ff;
+      cursor: pointer;
+    }
+
+    .file {
+      margin: 10px;
+      padding: 10px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>🔐 Your Vault</h1>
+
+<input type="file" id="file">
+<br>
+<button onclick="upload()">Upload</button>
+
+<h2>Your Files</h2>
+<div id="files"></div>
+
+<br>
+<button onclick="logout()">Logout</button>
+
+<script>
+
+let token = localStorage.getItem("token");
+
+// 🚨 PROTECT PAGE
+if (!token) {
+  alert("Login first ❌");
+  window.location.href = "/";
+}
+
+// ================= UPLOAD =================
+async function upload() {
+  const fileInput = document.getElementById("file");
+
+  if (!fileInput.files.length) {
+    alert("Select file first ❗");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", fileInput.files[0]);
+
+  const res = await fetch("/upload", {
+    method: "POST",
+    headers: {
+      "authorization": token
+    },
+    body: formData
+  });
+
+  const data = await res.json();
+
+  if (data.success) {
+    alert("Uploaded ✅");
+    loadFiles();
+  } else {
+    alert("Upload failed ❌");
+  }
+}
+
+// ================= LOAD FILES =================
+async function loadFiles() {
+  const res = await fetch("/files", {
+    headers: {
+      "authorization": token
+    }
+  });
+
+  const files = await res.json();
+
+  const div = document.getElementById("files");
+  div.innerHTML = "";
+
+  files.forEach(file => {
+    div.innerHTML += `
+      <div class="file">
+        ${file}
+        <br>
+        <button onclick="download('${file}')">Download</button>
+      </div>
+    `;
+  });
+}
+
+// ================= DOWNLOAD =================
+function download(file) {
+  window.open(`/download/${file}`, "_blank");
+}
+
+// ================= LOGOUT =================
+function logout() {
+  localStorage.removeItem("token");
+  window.location.href = "/";
+}
+
+// AUTO LOAD
+loadFiles();
+
+</script>
+
+</body>
+</html>
