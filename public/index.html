@@ -1,154 +1,102 @@
 <!DOCTYPE html>
 <html>
 <head>
-<<<<<<< HEAD
-  <title>Aurythos Vault</title>
+    <title>Aurythos Vault</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <style>
-    body {
-      margin: 0;
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-      font-family: Arial;
-      color: white;
-    }
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
 
-    .box {
-      background: rgba(255,255,255,0.05);
-      padding: 30px;
-      border-radius: 15px;
-      text-align: center;
-      width: 320px;
-      backdrop-filter: blur(10px);
-    }
+        .card {
+            background: rgba(255,255,255,0.05);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            width: 300px;
+            backdrop-filter: blur(10px);
+        }
 
-    h1 {
-      color: #00d4ff;
-    }
+        h2 {
+            color: #00eaff;
+            margin-bottom: 5px;
+        }
 
-    input {
-      width: 90%;
-      padding: 10px;
-      margin: 10px 0;
-      border-radius: 8px;
-      border: none;
-    }
+        p {
+            color: #ccc;
+            margin-bottom: 20px;
+        }
 
-    button {
-      padding: 10px 20px;
-      margin: 5px;
-      border: none;
-      border-radius: 8px;
-      background: #00d4ff;
-      cursor: pointer;
-    }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: none;
+            outline: none;
+        }
 
-    p {
-      color: #ccc;
-    }
-  </style>
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 8px;
+            background: #00eaff;
+            cursor: pointer;
+        }
+    </style>
 </head>
 
-<body>
-
-<div class="box">
-  <h1>Aurythos</h1>
-  <p>Secure Digital Vault</p>
-
-  <input id="username" placeholder="Username">
-  <input id="password" type="password" placeholder="Password">
-
-  <br>
-
-  <button onclick="register()">Register</button>
-  <button onclick="login()">Login</button>
-</div>
-
-<script>
-
-// REGISTER
-async function register() {
-  const username = document.getElementById("username").value;
-  const password = document.getElementById("password").value;
-
-  const res = await fetch("/register", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ username, password })
-  });
-
-  const data = await res.json();
-
-  if (data.success) {
-    alert("Registered ✅");
-  } else {
-    alert("User exists ❌");
-  }
-}
-
-// LOGIN
-async function login() {
-  const username = document.getElementById("username").value;
-  const password = document.getElementById("password").value;
-
-  const res = await fetch("/login", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ username, password })
-=======
-<link rel="stylesheet" href="style.css">
-</head>
 <body>
 
 <div class="card">
-<h2>Aurythos Vault</h2>
+    <h2>Aurythos</h2>
+    <p>Secure Digital Vault</p>
 
-<input id="user" placeholder="Username">
-<input id="pass" type="password" placeholder="Password">
+    <input id="username" placeholder="Username">
+    <input id="password" type="password" placeholder="Password">
 
-<button onclick="login()">Login</button>
+    <br>
 
-<p><a href="register.html">New user? Register</a></p>
+    <button onclick="register()">Register</button>
+    <button onclick="login()">Login</button>
 </div>
 
 <script>
+async function register() {
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
+
+    const res = await fetch("/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+    alert(JSON.stringify(data));
+}
+
 async function login() {
-  const res = await fetch("/login", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      username: user.value,
-      password: pass.value
-    })
->>>>>>> 3d18c41a99335717849f8471a319cac1bad42ccb
-  });
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
 
-  const data = await res.json();
+    const res = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+    });
 
-  if (data.success) {
-<<<<<<< HEAD
-    // 🔐 SAVE TOKEN
-    localStorage.setItem("token", data.token);
-
-    alert("Login success ✅");
-
-    // 🚀 REDIRECT
-    window.location.href = "/vault.html";
-  } else {
-    alert("Wrong credentials ❌");
-  }
+    const data = await res.json();
+    alert(JSON.stringify(data));
 }
-
-=======
-    window.location = "vault.html";
-  } else {
-    alert("Login failed");
-  }
-}
->>>>>>> 3d18c41a99335717849f8471a319cac1bad42ccb
 </script>
 
 </body>
