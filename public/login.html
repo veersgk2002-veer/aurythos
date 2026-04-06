@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="box">
+<h2>Aurythos Vault</h2>
+
+<form onsubmit="loginUser(event)">
+<input name="username" placeholder="Username" required>
+<input name="password" type="password" placeholder="Password" required>
+<button>Login</button>
+</form>
+
+<a href="register.html">New user? Register</a>
+</div>
+
+<script>
+function loginUser(e){
+  e.preventDefault();
+
+  fetch("/login", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      username: e.target.username.value,
+      password: e.target.password.value
+    })
+  })
+  .then(res=>res.json())
+  .then(data=>{
+    if(data.token){
+      localStorage.setItem("token", data.token);
+      window.location="vault.html";
+    } else {
+      alert(data.error || "Login failed");
+    }
+  });
+}
+</script>
+
+</body>
+</html>

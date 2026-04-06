@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+<<<<<<< HEAD
   <title>Aurythos Vault</title>
 
   <style>
@@ -113,10 +114,42 @@ async function loadFiles() {
         <br>
         <button onclick="download('${file}')">Download</button>
       </div>
+=======
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="card">
+<h2>Your Vault</h2>
+
+<input type="file" id="file">
+<button onclick="upload()">Upload</button>
+
+<div id="list"></div>
+
+<button onclick="logout()" style="background:red;">Logout</button>
+</div>
+
+<script>
+async function load() {
+  const res = await fetch("/files");
+  const files = await res.json();
+
+  list.innerHTML = "";
+
+  files.forEach(f => {
+    list.innerHTML += `
+      <p>${f.name}</p>
+      <button onclick="download('${f.name}')">Download</button>
+      <button onclick="del('${f.name}')">Delete</button>
+      <button onclick="share('${f.name}')">Share</button>
+      <hr>
+>>>>>>> 3d18c41a99335717849f8471a319cac1bad42ccb
     `;
   });
 }
 
+<<<<<<< HEAD
 // ================= DOWNLOAD =================
 function download(file) {
   window.open(`/download/${file}`, "_blank");
@@ -131,6 +164,44 @@ function logout() {
 // AUTO LOAD
 loadFiles();
 
+=======
+async function upload() {
+  const form = new FormData();
+  form.append("file", file.files[0]);
+
+  await fetch("/upload", { method: "POST", body: form });
+  load();
+}
+
+function download(name) {
+  window.location = "/download/" + name;
+}
+
+async function del(name) {
+  await fetch("/delete", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ name })
+  });
+  load();
+}
+
+async function share(name) {
+  const toUser = prompt("Enter username");
+  await fetch("/share", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ name, toUser })
+  });
+  alert("Shared");
+}
+
+function logout() {
+  window.location = "/logout";
+}
+
+load();
+>>>>>>> 3d18c41a99335717849f8471a319cac1bad42ccb
 </script>
 
 </body>

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+<<<<<<< HEAD
   <title>Aurythos Vault</title>
 
   <style>
@@ -97,11 +98,38 @@ async function login() {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({ username, password })
+=======
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="card">
+<h2>Aurythos Vault</h2>
+
+<input id="user" placeholder="Username">
+<input id="pass" type="password" placeholder="Password">
+
+<button onclick="login()">Login</button>
+
+<p><a href="register.html">New user? Register</a></p>
+</div>
+
+<script>
+async function login() {
+  const res = await fetch("/login", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      username: user.value,
+      password: pass.value
+    })
+>>>>>>> 3d18c41a99335717849f8471a319cac1bad42ccb
   });
 
   const data = await res.json();
 
   if (data.success) {
+<<<<<<< HEAD
     // 🔐 SAVE TOKEN
     localStorage.setItem("token", data.token);
 
@@ -114,6 +142,13 @@ async function login() {
   }
 }
 
+=======
+    window.location = "vault.html";
+  } else {
+    alert("Login failed");
+  }
+}
+>>>>>>> 3d18c41a99335717849f8471a319cac1bad42ccb
 </script>
 
 </body>

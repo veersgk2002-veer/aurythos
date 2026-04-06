@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Vault</title>
+
+<style>
+body {
+    font-family: Arial;
+    background: linear-gradient(135deg,#0f2027,#2c5364);
+    color:white;
+    text-align:center;
+}
+
+button {
+    padding:10px;
+    margin:5px;
+    border:none;
+    border-radius:8px;
+}
+
+.upload-btn { background:#00c6ff; }
+.delete-btn { background:red; color:white; }
+.download-btn { background:green; color:white; }
+
+</style>
+
+</head>
+
+<body>
+
+<h1>Your Vault</h1>
+
+<input type="file" id="files" multiple>
+<button class="upload-btn" onclick="upload()">Upload</button>
+
+<h2>Your Files</h2>
+<ul id="fileList"></ul>
+
+<a href="/logout">Logout</a>
+
+<script>
+
+async function loadFiles() {
+    let res = await fetch('/files');
+    let files = await res.json();
+
+    let list = document.getElementById('fileList');
+    list.innerHTML = "";
+
+    files.forEach(f => {
+        list.innerHTML += `
+        <li>
+            ${f}
+            <button class="download-btn" onclick="downloadFile('${f}')">Download</button>
+            <button class="delete-btn" onclick="deleteFile('${f}')">Delete</button>
+        </li>`;
+    });
+}
+
+async function upload() {
+    let files = document.getElementById('files').files;
+
+    let formData = new FormData();
+    for (let f of files) {
+        formData.append('files', f);
+    }
+
+    await fetch('/upload', {
+        method: 'POST',
+        body: formData
+    });
+
+    loadFiles();
+}
+
+function downloadFile(name) {
+    window.location = '/download/' + name;
+}
+
+async function deleteFile(name) {
+    await fetch('/delete/' + name);
+    loadFiles();
+}
+
+loadFiles();
+
+</script>
+
+</body>
+</html>
