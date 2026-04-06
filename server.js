@@ -1,52 +1,65 @@
 const express = require("express");
 const multer = require("multer");
-const path = require("path");
 const fs = require("fs");
+const bcrypt = require("bcryptjs");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// create uploads folder if not exists
-if (!fs.existsSync("uploads")) {
-    fs.mkdirSync("uploads");
-}
-
-// multer setup
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, "uploads/");
-    },
-    filename: function (req, file, cb) {
-        const uniqueName = Date.now() + "-" + file.originalname;
-        cb(null, uniqueName);
-    }
-});
-
-const upload = multer({ storage: storage });
-
-// middleware
 app.use(express.json());
 app.use(express.static("public"));
-app.use("/uploads", express.static("uploads"));
 
-// test route
+// simple database (file)
+let users = [];
+
+if (fs.existsSync("users.json")) {
+    users = JSON.parse(fs.readFileSync("users.json"));
+}
+
+// REGISTER
+app.post("/register", async (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.json({ success: false, message: "Missing fields" });
+    }
+
+    const exist = users.find(u => u.username === username);
+    if (exist) {
+        return res.json({ success: false, message: "User exists" });
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+
+    users.push({ username, password: hashed });
+    fs.writeFileSync("users.json", JSON.stringify(users));
+
+    res.json({ success: true });
+});
+
+// LOGIN
+app.post("/login", async (req, res) => {
+    const { username, password } = req.body;
+
+    const user = users.find(u => u.username === username);
+    if (!user) {
+        return res.json({ success: false, message: "User not found" });
+    }
+
+    const match = await bcrypt.compare(password, user.password);
+
+    if (!match) {
+        return res.json({ success: false, message: "Wrong password" });
+    }
+
+    res.json({ success: true });
+});
+
+// TEST
 app.get("/test", (req, res) => {
     res.json({ message: "Server working ✅" });
 });
 
-// upload route
-app.post("/upload", upload.single("file"), (req, res) => {
-    if (!req.file) {
-        return res.json({ success: false });
-    }
-
-    res.json({
-        success: true,
-        file: req.file.filename
-    });
-});
-
-// start server
 app.listen(PORT, () => {
     console.log("Server running on port " + PORT);
 });
