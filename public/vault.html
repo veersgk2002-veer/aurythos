@@ -1,208 +1,201 @@
 <!DOCTYPE html>
 <html>
 <head>
-<<<<<<< HEAD
-  <title>Aurythos Vault</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vault</title>
 
-  <style>
-    body {
-      margin: 0;
-      padding: 20px;
-      background: #0f2027;
-      color: white;
-      font-family: Arial;
-      text-align: center;
-    }
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: system-ui, sans-serif;
+}
 
-    h1 {
-      color: #00d4ff;
-    }
+body {
+  background: #f8fafc;
+  color: #0f172a;
+}
 
-    input {
-      margin: 10px;
-    }
+.header {
+  display: flex;
+  justify-content: space-between;
+  padding: 16px;
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+}
 
-    button {
-      padding: 10px;
-      margin: 5px;
-      border: none;
-      border-radius: 8px;
-      background: #00d4ff;
-      cursor: pointer;
-    }
+.title {
+  font-weight: 600;
+}
 
-    .file {
-      margin: 10px;
-      padding: 10px;
-      background: rgba(255,255,255,0.05);
-      border-radius: 10px;
-    }
-  </style>
+.logout {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.container {
+  padding: 16px;
+}
+
+.upload-box {
+  background: white;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 20px;
+}
+
+.upload-btn {
+  margin-top: 10px;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: white;
+}
+
+.file {
+  background: white;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.file-name {
+  font-size: 14px;
+  color: #334155;
+}
+
+.actions button {
+  margin-left: 6px;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.download {
+  background: #22c55e;
+  color: white;
+}
+
+.delete {
+  background: #ef4444;
+  color: white;
+}
+</style>
 </head>
 
 <body>
 
-<h1>🔐 Your Vault</h1>
+<div class="header">
+  <div class="title">Aurythos Vault</div>
+  <div class="logout" onclick="logout()">Logout</div>
+</div>
 
-<input type="file" id="file">
-<br>
-<button onclick="upload()">Upload</button>
+<div class="container">
 
-<h2>Your Files</h2>
-<div id="files"></div>
+  <div class="upload-box">
+    <input type="file" id="file" multiple>
+    <button class="upload-btn" onclick="upload()">Upload File</button>
+  </div>
 
-<br>
-<button onclick="logout()">Logout</button>
+  <div id="files"></div>
 
-<script>
-
-let token = localStorage.getItem("token");
-
-// 🚨 PROTECT PAGE
-if (!token) {
-  alert("Login first ❌");
-  window.location.href = "/";
-}
-
-// ================= UPLOAD =================
-async function upload() {
-  const fileInput = document.getElementById("file");
-
-  if (!fileInput.files.length) {
-    alert("Select file first ❗");
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append("file", fileInput.files[0]);
-
-  const res = await fetch("/upload", {
-    method: "POST",
-    headers: {
-      "authorization": token
-    },
-    body: formData
-  });
-
-  const data = await res.json();
-
-  if (data.success) {
-    alert("Uploaded ✅");
-    loadFiles();
-  } else {
-    alert("Upload failed ❌");
-  }
-}
-
-// ================= LOAD FILES =================
-async function loadFiles() {
-  const res = await fetch("/files", {
-    headers: {
-      "authorization": token
-    }
-  });
-
-  const files = await res.json();
-
-  const div = document.getElementById("files");
-  div.innerHTML = "";
-
-  files.forEach(file => {
-    div.innerHTML += `
-      <div class="file">
-        ${file}
-        <br>
-        <button onclick="download('${file}')">Download</button>
-      </div>
-=======
-<link rel="stylesheet" href="style.css">
-</head>
-<body>
-
-<div class="card">
-<h2>Your Vault</h2>
-
-<input type="file" id="file">
-<button onclick="upload()">Upload</button>
-
-<div id="list"></div>
-
-<button onclick="logout()" style="background:red;">Logout</button>
 </div>
 
 <script>
-async function load() {
-  const res = await fetch("/files");
+const token = localStorage.getItem("token");
+
+function logout(){
+  localStorage.clear();
+  window.location = "/";
+}
+
+async function loadFiles(){
+  const res = await fetch("/api/files", {
+    headers:{ authorization: token }
+  });
+
   const files = await res.json();
+  const container = document.getElementById("files");
 
-  list.innerHTML = "";
+  container.innerHTML = "";
 
-  files.forEach(f => {
-    list.innerHTML += `
-      <p>${f.name}</p>
-      <button onclick="download('${f.name}')">Download</button>
-      <button onclick="del('${f.name}')">Delete</button>
-      <button onclick="share('${f.name}')">Share</button>
-      <hr>
->>>>>>> 3d18c41a99335717849f8471a319cac1bad42ccb
+  files.forEach(file=>{
+    container.innerHTML += `
+      <div class="file">
+        <div>${file}</div>
+        <div>
+          <button onclick="download('${file}')">Download</button>
+          <button onclick="share('${file}')">Share</button>
+          <button onclick="del('${file}')">Delete</button>
+        </div>
+      </div>
     `;
   });
 }
 
-<<<<<<< HEAD
-// ================= DOWNLOAD =================
-function download(file) {
-  window.open(`/download/${file}`, "_blank");
-}
+// MULTIPLE UPLOAD
+async function upload(){
+  const files = document.getElementById("file").files;
 
-// ================= LOGOUT =================
-function logout() {
-  localStorage.removeItem("token");
-  window.location.href = "/";
-}
+  if(files.length === 0){
+    alert("Select file");
+    return;
+  }
 
-// AUTO LOAD
-loadFiles();
-
-=======
-async function upload() {
   const form = new FormData();
-  form.append("file", file.files[0]);
 
-  await fetch("/upload", { method: "POST", body: form });
-  load();
-}
+  for(let i=0; i<files.length; i++){
+    form.append("files", files[i]); // must be "files"
+  }
 
-function download(name) {
-  window.location = "/download/" + name;
-}
-
-async function del(name) {
-  await fetch("/delete", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ name })
+  await fetch("/api/upload", {
+    method:"POST",
+    headers:{ authorization: token },
+    body: form
   });
-  load();
+
+  loadFiles();
 }
 
-async function share(name) {
-  const toUser = prompt("Enter username");
-  await fetch("/share", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ name, toUser })
+function download(file){
+  window.open(`/uploads/${localStorage.getItem("username")}/${file}`);
+}
+
+// SHARE
+async function share(file){
+  const toUser = prompt("Enter username to share:");
+  if(!toUser) return;
+
+  await fetch("/api/share", {
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      authorization: token
+    },
+    body: JSON.stringify({ file, toUser })
   });
+
   alert("Shared");
 }
 
-function logout() {
-  window.location = "/logout";
+// DELETE
+async function del(file){
+  await fetch("/api/delete/"+file,{
+    method:"DELETE",
+    headers:{ authorization: token }
+  });
+
+  loadFiles();
 }
 
-load();
->>>>>>> 3d18c41a99335717849f8471a319cac1bad42ccb
+loadFiles();
 </script>
-
 </body>
 </html>

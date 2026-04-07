@@ -1,96 +1,119 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Aurythos Vault</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aurythos Vault</title>
 
-    <style>
-        body {
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-            font-family: Arial;
-        }
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: system-ui, sans-serif;
+}
 
-        .box {
-            background: rgba(255,255,255,0.05);
-            padding: 30px;
-            border-radius: 15px;
-            width: 280px;
-            text-align: center;
-            color: white;
-        }
+body {
+  background: #f8fafc;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
 
-        h2 {
-            color: #00eaff;
-        }
+.card {
+  width: 90%;
+  max-width: 360px;
+  background: white;
+  padding: 28px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
 
-        input {
-            width: 100%;
-            padding: 10px;
-            margin: 8px 0;
-            border-radius: 8px;
-            border: none;
-        }
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #0f172a;
+  text-align: center;
+  margin-bottom: 20px;
+}
 
-        button {
-            width: 48%;
-            padding: 10px;
-            margin: 5px;
-            border: none;
-            border-radius: 8px;
-            background: #00c6ff;
-            color: black;
-            font-weight: bold;
-        }
-    </style>
+.input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  outline: none;
+}
+
+.input:focus {
+  border-color: #2563eb;
+}
+
+.button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  border-radius: 8px;
+  border: none;
+  background: #2563eb;
+  color: white;
+  font-weight: 500;
+}
+
+.button:hover {
+  background: #1d4ed8;
+}
+
+.secondary {
+  background: white;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+}
+</style>
 </head>
 
 <body>
 
-<div class="box">
-    <h2>Aurythos</h2>
-    <p>Secure Digital Vault</p>
+<div class="card">
+  <div class="title">Aurythos Vault</div>
 
-    <input id="user" placeholder="Username">
-    <input id="pass" type="password" placeholder="Password">
+  <input id="username" class="input" placeholder="Username">
+  <input id="password" class="input" type="password" placeholder="Password">
 
-    <br>
-
-    <button onclick="register()">Register</button>
-    <button onclick="login()">Login</button>
+  <button class="button" onclick="login()">Login</button>
+  <button class="button secondary" onclick="register()">Create Account</button>
 </div>
 
 <script>
 async function register() {
-    const username = document.getElementById("user").value;
-    const password = document.getElementById("pass").value;
-
-    const res = await fetch("/register", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ username, password })
-    });
-
-    const data = await res.json();
-    alert(data.message);
+  await fetch("/api/register", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({
+      username: username.value,
+      password: password.value
+    })
+  });
+  alert("Account created");
 }
 
 async function login() {
-    const username = document.getElementById("user").value;
-    const password = document.getElementById("pass").value;
+  const res = await fetch("/api/login", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({
+      username: username.value,
+      password: password.value
+    })
+  });
 
-    const res = await fetch("/login", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ username, password })
-    });
+  const data = await res.json();
 
-    const data = await res.json();
-    alert(data.message);
+  localStorage.setItem("token", data.token);
+  localStorage.setItem("username", data.username);
+
+  window.location = "/vault";
 }
 </script>
 
