@@ -3,209 +3,77 @@
 <head>
 <title>Vault</title>
 <style>
-body{font-family:sans-serif;background:#f5f7fb;margin:0;}
-.top{background:white;padding:15px;display:flex;justify-content:space-between;}
-.container{padding:20px;}
-.card{background:white;padding:20px;border-radius:10px;}
-.file{background:white;padding:10px;margin-top:10px;display:flex;justify-content:space-between;}
-button{background:#2563eb;color:white;border:none;padding:6px 10px;}
+body {font-family:sans-serif;background:#f5f7fb;padding:20px;}
+button {background:#2f6fed;color:white;border:none;padding:8px;}
+.file {background:white;margin:10px 0;padding:10px;}
 </style>
 </head>
 <body>
 
-<div class="top">
-<b>Aurythos Vault</b>
-<button onclick="logout()">Logout</button>
-</div>
+<h2>Your Vault</h2>
 
-<div class="container">
-
-<div class="card">
-<input type="file" id="file" multiple>
+<input type="file" id="files" multiple>
 <button onclick="upload()">Upload</button>
-</div>
 
-<h3>Your Files</h3>
-<div id="files"></div>
-
-<h3>Shared With You</h3>
-<div id="shared"></div>
-
-</div>
+<div id="list"></div>
 
 <script>
 const token = localStorage.getItem("token");
-let userKey;
 
-// ===== KEY =====
-async function deriveKey(password){
-  const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey("raw",enc.encode(password),{name:"PBKDF2"},false,["deriveKey"]);
-  return crypto.subtle.deriveKey({
-    name:"PBKDF2",
-    salt:enc.encode("vault"),
-    iterations:100000,
-    hash:"SHA-256"
-  },keyMaterial,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+if(!token){
+  window.location.href="/";
 }
 
-// ===== INIT =====
-async function initKey(){
+async function load(){
+  const res = await fetch("/api/files",{
+    headers:{Authorization:"Bearer "+token}
+  });
 
-  let savedKey = sessionStorage.getItem("vaultKey");
-
-  if(savedKey){
-    userKey = await crypto.subtle.importKey(
-      "raw",
-      Uint8Array.from(atob(savedKey), c=>c.charCodeAt(0)),
-      "AES-GCM",
-      false,
-      ["encrypt","decrypt"]
-    );
-  }else{
-
-    const password = localStorage.getItem("vaultPass");
-
-    const enc = new TextEncoder();
-    const keyMaterial = await crypto.subtle.importKey(
-      "raw",
-      enc.encode(password),
-      {name:"PBKDF2"},
-      false,
-      ["deriveKey"]
-    );
-
-    userKey = await crypto.subtle.deriveKey({
-      name:"PBKDF2",
-      salt:enc.encode("vault"),
-      iterations:100000,
-      hash:"SHA-256"
-    }, keyMaterial, {
-      name:"AES-GCM",
-      length:256
-    }, false, ["encrypt","decrypt"]);
-
-    const raw = await crypto.subtle.exportKey("raw",userKey);
-
-    sessionStorage.setItem(
-      "vaultKey",
-      btoa(String.fromCharCode(...new Uint8Array(raw)))
-    );
-  }
-
-  loadFiles();
-  loadShared();
-}
-
-initKey();
-// ===== ENCRYPT =====
-async function encryptFile(file){
-  const data = await file.arrayBuffer();
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const enc = await crypto.subtle.encrypt({name:"AES-GCM",iv},userKey,data);
-  return new Blob([iv,new Uint8Array(enc)]);
-}
-
-// ===== DECRYPT =====
-async function decryptFile(blob){
-  const buf = await blob.arrayBuffer();
-  const iv = buf.slice(0,12);
-  const data = buf.slice(12);
-  const dec = await crypto.subtle.decrypt({name:"AES-GCM",iv:new Uint8Array(iv)},userKey,data);
-  return new Blob([dec]);
-}
-
-// ===== UPLOAD =====
-async function upload(){
-  const input = document.getElementById("file");
-  const form = new FormData();
-
-  for(let f of input.files){
-    const enc = await encryptFile(f);
-    form.append("files",enc,f.name);
-  }
-
-  await fetch("/api/upload",{method:"POST",headers:{authorization:token},body:form});
-  loadFiles();
-}
-
-// ===== LOAD FILES =====
-async function loadFiles(){
-  const res = await fetch("/api/files",{headers:{authorization:token}});
   const files = await res.json();
 
-  const div = document.getElementById("files");
-  div.innerHTML="";
-
+  let html="";
   files.forEach(f=>{
-    div.innerHTML+=`
+    html += `
     <div class="file">
       ${f}
-      <div>
-        <button onclick="download('${f}')">Download</button>
-        <button onclick="share('${f}')">Share</button>
-        <button onclick="del('${f}')">Delete</button>
-      </div>
+      <button onclick="download('${f}')">Download</button>
+      <button onclick="del('${f}')">Delete</button>
     </div>`;
   });
+
+  document.getElementById("list").innerHTML = html;
 }
 
-// ===== DOWNLOAD =====
-async function download(file){
-  const res = await fetch("/api/download/"+file,{headers:{authorization:token}});
-  const blob = await res.blob();
-  const dec = await decryptFile(blob);
+async function upload(){
+  const input = document.getElementById("files");
+  const formData = new FormData();
 
-  const url = URL.createObjectURL(dec);
-  const a = document.createElement("a");
-  a.href=url;
-  a.download=file;
-  a.click();
-}
+  for(let i=0;i<input.files.length;i++){
+    formData.append("files", input.files[i]);
+  }
 
-// ===== DELETE =====
-async function del(file){
-  await fetch("/api/delete/"+file,{method:"DELETE",headers:{authorization:token}});
-  loadFiles();
-}
-
-// ===== SHARE =====
-async function share(file){
-  const user = prompt("Enter username to share");
-
-  await fetch("/api/share",{
+  await fetch("/api/upload",{
     method:"POST",
-    headers:{
-      "Content-Type":"application/json",
-      authorization:token
-    },
-    body:JSON.stringify({file,to:user})
+    headers:{Authorization:"Bearer "+token},
+    body:formData
   });
 
-  alert("Shared");
+  load();
 }
 
-// ===== LOAD SHARED =====
-async function loadShared(){
-  const res = await fetch("/api/shared",{headers:{authorization:token}});
-  const data = await res.json();
+function download(f){
+  window.open("/api/download/"+f+"?token="+token);
+}
 
-  const div = document.getElementById("shared");
-  div.innerHTML="";
-
-  data.forEach(s=>{
-    div.innerHTML+=`
-    <div class="file">
-      ${s.file} (from ${s.from})
-    </div>`;
+async function del(f){
+  await fetch("/api/delete/"+f,{
+    method:"DELETE",
+    headers:{Authorization:"Bearer "+token}
   });
+  load();
 }
 
-function logout(){
-  localStorage.clear();
-  sessionStorage.clear();
-  location.href="/";
-}
+load();
 </script>
 
 </body>

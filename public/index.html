@@ -2,137 +2,91 @@
 <html>
 <head>
 <title>Aurythos Vault</title>
-
 <style>
-body{
-  margin:0;
-  font-family:sans-serif;
+body {
   background:#0b1f3a;
+  font-family:sans-serif;
   display:flex;
   justify-content:center;
   align-items:center;
   height:100vh;
 }
-
-.box{
+.box {
   background:white;
-  padding:30px;
-  border-radius:12px;
-  width:300px;
-  box-shadow:0 10px 30px rgba(0,0,0,0.2);
-}
-
-h2{
+  padding:25px;
+  border-radius:10px;
+  width:280px;
   text-align:center;
-  margin-bottom:20px;
 }
-
-input{
+input {
   width:100%;
-  padding:12px;
+  padding:10px;
   margin:8px 0;
-  border-radius:6px;
-  border:1px solid #ccc;
 }
-
-button{
+button {
   width:100%;
-  padding:12px;
-  margin-top:10px;
-  border:none;
-  border-radius:6px;
-  background:#2563eb;
+  padding:10px;
+  background:#2f6fed;
   color:white;
-  font-weight:bold;
-  cursor:pointer;
-}
-
-button:hover{
-  background:#1e4fd1;
-}
-
-.link{
-  text-align:center;
-  margin-top:15px;
-  font-size:14px;
-  color:#2563eb;
-  cursor:pointer;
-}
-
-.small{
-  font-size:12px;
-  color:#555;
-  text-align:center;
+  border:none;
   margin-top:10px;
+}
+.link {
+  margin-top:10px;
+  color:#2f6fed;
+  cursor:pointer;
 }
 </style>
-
 </head>
 <body>
 
 <div class="box">
-
-<h2>Aurythos Vault</h2>
+<h3>Aurythos Vault</h3>
 
 <input id="username" placeholder="Username">
 <input id="password" type="password" placeholder="Password">
 
 <button onclick="login()">Login</button>
-
 <div class="link" onclick="register()">Create account</div>
-
-<div class="small">Secure • Private • Encrypted</div>
 
 </div>
 
 <script>
-
-// ===== LOGIN =====
 async function login(){
-  const res = await fetch("/api/login",{
+  const username = usernameInput.value;
+  const password = passwordInput.value;
+
+  const res = await fetch("/api/login", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      username:username.value,
-      password:password.value
-    })
+    body: JSON.stringify({username,password})
   });
 
   const data = await res.json();
 
-  if(!data.token){
-    alert("Login failed");
-    return;
+  if(data.token){
+    localStorage.setItem("token", data.token);
+    window.location.href="/vault.html";
+  } else {
+    alert(data.message);
   }
-
-  localStorage.setItem("token",data.token);
-  localStorage.setItem("vaultPass",password.value); // store for encryption
-
-  location.href="/vault";
 }
 
-// ===== REGISTER =====
 async function register(){
-  const res = await fetch("/api/register",{
+  const username = usernameInput.value;
+  const password = passwordInput.value;
+
+  await fetch("/api/register",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      username:username.value,
-      password:password.value
-    })
+    body: JSON.stringify({username,password})
   });
 
-  const text = await res.text();
-
-  if(text === "User exists"){
-    alert("User already exists");
-    return;
-  }
-
-  // AUTO LOGIN AFTER REGISTER
-  await login();
+  alert("Registered. Now login.");
 }
 
+const usernameInput = document.getElementById("username");
+const passwordInput = document.getElementById("password");
 </script>
 
 </body>
