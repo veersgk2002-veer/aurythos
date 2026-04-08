@@ -1,201 +1,212 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vault</title>
-
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: system-ui, sans-serif;
-}
-
-body {
-  background: #f8fafc;
-  color: #0f172a;
-}
-
-.header {
-  display: flex;
-  justify-content: space-between;
-  padding: 16px;
-  background: white;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.title {
-  font-weight: 600;
-}
-
-.logout {
-  color: #64748b;
-  font-size: 14px;
-}
-
-.container {
-  padding: 16px;
-}
-
-.upload-box {
-  background: white;
-  padding: 16px;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  margin-bottom: 20px;
-}
-
-.upload-btn {
-  margin-top: 10px;
-  width: 100%;
-  padding: 10px;
-  border: none;
-  border-radius: 8px;
-  background: #2563eb;
-  color: white;
-}
-
-.file {
-  background: white;
-  padding: 12px;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  margin-bottom: 10px;
-  display: flex;
-  justify-content: space-between;
-}
-
-.file-name {
-  font-size: 14px;
-  color: #334155;
-}
-
-.actions button {
-  margin-left: 6px;
-  border: none;
-  padding: 6px 10px;
-  border-radius: 6px;
-}
-
-.download {
-  background: #22c55e;
-  color: white;
-}
-
-.delete {
-  background: #ef4444;
-  color: white;
-}
+body{font-family:sans-serif;background:#f5f7fb;margin:0;}
+.top{background:white;padding:15px;display:flex;justify-content:space-between;}
+.container{padding:20px;}
+.card{background:white;padding:20px;border-radius:10px;}
+.file{background:white;padding:10px;margin-top:10px;display:flex;justify-content:space-between;}
+button{background:#2563eb;color:white;border:none;padding:6px 10px;}
 </style>
 </head>
-
 <body>
 
-<div class="header">
-  <div class="title">Aurythos Vault</div>
-  <div class="logout" onclick="logout()">Logout</div>
+<div class="top">
+<b>Aurythos Vault</b>
+<button onclick="logout()">Logout</button>
 </div>
 
 <div class="container">
 
-  <div class="upload-box">
-    <input type="file" id="file" multiple>
-    <button class="upload-btn" onclick="upload()">Upload File</button>
-  </div>
+<div class="card">
+<input type="file" id="file" multiple>
+<button onclick="upload()">Upload</button>
+</div>
 
-  <div id="files"></div>
+<h3>Your Files</h3>
+<div id="files"></div>
+
+<h3>Shared With You</h3>
+<div id="shared"></div>
 
 </div>
 
 <script>
 const token = localStorage.getItem("token");
+let userKey;
 
-function logout(){
-  localStorage.clear();
-  window.location = "/";
+// ===== KEY =====
+async function deriveKey(password){
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey("raw",enc.encode(password),{name:"PBKDF2"},false,["deriveKey"]);
+  return crypto.subtle.deriveKey({
+    name:"PBKDF2",
+    salt:enc.encode("vault"),
+    iterations:100000,
+    hash:"SHA-256"
+  },keyMaterial,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
 }
 
-async function loadFiles(){
-  const res = await fetch("/api/files", {
-    headers:{ authorization: token }
-  });
+// ===== INIT =====
+async function initKey(){
 
-  const files = await res.json();
-  const container = document.getElementById("files");
+  let savedKey = sessionStorage.getItem("vaultKey");
 
-  container.innerHTML = "";
+  if(savedKey){
+    userKey = await crypto.subtle.importKey(
+      "raw",
+      Uint8Array.from(atob(savedKey), c=>c.charCodeAt(0)),
+      "AES-GCM",
+      false,
+      ["encrypt","decrypt"]
+    );
+  }else{
 
-  files.forEach(file=>{
-    container.innerHTML += `
-      <div class="file">
-        <div>${file}</div>
-        <div>
-          <button onclick="download('${file}')">Download</button>
-          <button onclick="share('${file}')">Share</button>
-          <button onclick="del('${file}')">Delete</button>
-        </div>
-      </div>
-    `;
-  });
-}
+    const password = localStorage.getItem("vaultPass");
 
-// MULTIPLE UPLOAD
-async function upload(){
-  const files = document.getElementById("file").files;
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      "raw",
+      enc.encode(password),
+      {name:"PBKDF2"},
+      false,
+      ["deriveKey"]
+    );
 
-  if(files.length === 0){
-    alert("Select file");
-    return;
+    userKey = await crypto.subtle.deriveKey({
+      name:"PBKDF2",
+      salt:enc.encode("vault"),
+      iterations:100000,
+      hash:"SHA-256"
+    }, keyMaterial, {
+      name:"AES-GCM",
+      length:256
+    }, false, ["encrypt","decrypt"]);
+
+    const raw = await crypto.subtle.exportKey("raw",userKey);
+
+    sessionStorage.setItem(
+      "vaultKey",
+      btoa(String.fromCharCode(...new Uint8Array(raw)))
+    );
   }
 
+  loadFiles();
+  loadShared();
+}
+
+initKey();
+// ===== ENCRYPT =====
+async function encryptFile(file){
+  const data = await file.arrayBuffer();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const enc = await crypto.subtle.encrypt({name:"AES-GCM",iv},userKey,data);
+  return new Blob([iv,new Uint8Array(enc)]);
+}
+
+// ===== DECRYPT =====
+async function decryptFile(blob){
+  const buf = await blob.arrayBuffer();
+  const iv = buf.slice(0,12);
+  const data = buf.slice(12);
+  const dec = await crypto.subtle.decrypt({name:"AES-GCM",iv:new Uint8Array(iv)},userKey,data);
+  return new Blob([dec]);
+}
+
+// ===== UPLOAD =====
+async function upload(){
+  const input = document.getElementById("file");
   const form = new FormData();
 
-  for(let i=0; i<files.length; i++){
-    form.append("files", files[i]); // must be "files"
+  for(let f of input.files){
+    const enc = await encryptFile(f);
+    form.append("files",enc,f.name);
   }
 
-  await fetch("/api/upload", {
-    method:"POST",
-    headers:{ authorization: token },
-    body: form
-  });
-
+  await fetch("/api/upload",{method:"POST",headers:{authorization:token},body:form});
   loadFiles();
 }
 
-function download(file){
-  window.open(`/uploads/${localStorage.getItem("username")}/${file}`);
+// ===== LOAD FILES =====
+async function loadFiles(){
+  const res = await fetch("/api/files",{headers:{authorization:token}});
+  const files = await res.json();
+
+  const div = document.getElementById("files");
+  div.innerHTML="";
+
+  files.forEach(f=>{
+    div.innerHTML+=`
+    <div class="file">
+      ${f}
+      <div>
+        <button onclick="download('${f}')">Download</button>
+        <button onclick="share('${f}')">Share</button>
+        <button onclick="del('${f}')">Delete</button>
+      </div>
+    </div>`;
+  });
 }
 
-// SHARE
-async function share(file){
-  const toUser = prompt("Enter username to share:");
-  if(!toUser) return;
+// ===== DOWNLOAD =====
+async function download(file){
+  const res = await fetch("/api/download/"+file,{headers:{authorization:token}});
+  const blob = await res.blob();
+  const dec = await decryptFile(blob);
 
-  await fetch("/api/share", {
+  const url = URL.createObjectURL(dec);
+  const a = document.createElement("a");
+  a.href=url;
+  a.download=file;
+  a.click();
+}
+
+// ===== DELETE =====
+async function del(file){
+  await fetch("/api/delete/"+file,{method:"DELETE",headers:{authorization:token}});
+  loadFiles();
+}
+
+// ===== SHARE =====
+async function share(file){
+  const user = prompt("Enter username to share");
+
+  await fetch("/api/share",{
     method:"POST",
     headers:{
       "Content-Type":"application/json",
-      authorization: token
+      authorization:token
     },
-    body: JSON.stringify({ file, toUser })
+    body:JSON.stringify({file,to:user})
   });
 
   alert("Shared");
 }
 
-// DELETE
-async function del(file){
-  await fetch("/api/delete/"+file,{
-    method:"DELETE",
-    headers:{ authorization: token }
-  });
+// ===== LOAD SHARED =====
+async function loadShared(){
+  const res = await fetch("/api/shared",{headers:{authorization:token}});
+  const data = await res.json();
 
-  loadFiles();
+  const div = document.getElementById("shared");
+  div.innerHTML="";
+
+  data.forEach(s=>{
+    div.innerHTML+=`
+    <div class="file">
+      ${s.file} (from ${s.from})
+    </div>`;
+  });
 }
 
-loadFiles();
+function logout(){
+  localStorage.clear();
+  sessionStorage.clear();
+  location.href="/";
+}
 </script>
+
 </body>
 </html>
