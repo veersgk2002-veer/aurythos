@@ -15,6 +15,9 @@ app.use(express.static('public'));
 
 const SECRET = "vault_secret";
 
+if (!fs.existsSync('./uploads')) {
+  fs.mkdirSync('./uploads', { recursive: true });
+}
 /* ================= STORAGE ================= */
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 
@@ -162,6 +165,8 @@ app.post('/api/share', auth, (req, res) => {
 });
 
 /* ================= START ================= */
-app.listen(4000, () => {
-  console.log("🔐 Zero-Knowledge Vault running on http://localhost:4000");
+const PORT = process.env.PORT || 4000;
+
+app.listen(PORT, () => {
+  console.log("🚀 Running on port " + PORT);
 });
