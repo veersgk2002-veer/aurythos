@@ -1,0 +1,10 @@
+{
+  "users": [
+    {
+      "password": "$2a$10$OgxlaBDGRcwCPngq6rqGN.71yeIewNftObV/e.HQwhA3mwUm.bIH2",
+      "vault": "b1fc5467da5dc42163bcd076625e0517:dfb7794a644963a1809580f29b5de691d765679e95c06e77c83ffc2f00984b1b622cb3f325095b4e27b04d13740c8a2f60b69aedb9d63737a4f175cd71c6c4f3c44ed2a8edd8e6b8232ac1f005cc084b",
+      "files": []
+    }
+  ],
+  "shares": []
+}

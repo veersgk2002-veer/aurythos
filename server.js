@@ -1,118 +1,167 @@
-require("dotenv").config();
+require('dotenv').config();
 
-const express = require("express");
-const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
-const multer = require("multer");
-const fs = require("fs");
-const path = require("path");
-const jwt = require("jsonwebtoken");
+const express = require('express');
+const multer = require('multer');
+const cors = require('cors');
+const fs = require('fs');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const path = require('path');
 
 const app = express();
-
-// ===== Middleware =====
+app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static("public"));
+app.use(express.static('public'));
 
-// ===== MongoDB =====
-mongoose.connect(process.env.MONGO_URI)
-.then(() => console.log("MongoDB connected"))
-.catch(err => console.log(err));
+const SECRET = "vault_secret";
 
-// ===== Models =====
-const User = mongoose.model("User", {
-  username: { type: String, unique: true },
-  password: String
-});
+/* ================= STORAGE ================= */
+if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 
-// ===== Auth Middleware =====
-function auth(req, res, next) {
-  const header = req.headers.authorization;
-  if (!header) return res.send("No token");
+const upload = multer({ storage: multer.memoryStorage() });
 
-  const token = header.split(" ")[1];
-
+/* ================= JSON ================= */
+function readJSON(file) {
   try {
-    const decoded = jwt.verify(token, "secret123");
-    req.user = decoded.username;
-    next();
+    if (!fs.existsSync(file)) return [];
+    const data = fs.readFileSync(file);
+    return data.length ? JSON.parse(data) : [];
   } catch {
-    res.send("Invalid token");
+    return [];
   }
 }
 
-// ===== Storage =====
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = "uploads/" + req.user;
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
-  }
-});
+function writeJSON(file, data) {
+  fs.writeFileSync(file, JSON.stringify(data, null, 2));
+}
 
-const upload = multer({ storage });
-
-// ===== ROUTES =====
-
-// Register
-app.post("/api/register", async (req, res) => {
-  const { username, password } = req.body;
-
-  const hash = await bcrypt.hash(password, 10);
+/* ================= AUTH ================= */
+function auth(req, res, next) {
+  const token = req.headers.authorization;
+  if (!token) return res.sendStatus(401);
 
   try {
-    await User.create({ username, password: hash });
-    res.json({ message: "Registered" });
+    req.user = jwt.verify(token, SECRET);
+    next();
   } catch {
-    res.json({ message: "User exists" });
+    res.sendStatus(403);
   }
-});
+}
 
-// Login
-app.post("/api/login", async (req, res) => {
+/* ================= AUTH ROUTES ================= */
+app.post('/api/register', (req, res) => {
+  const users = readJSON('users.json');
   const { username, password } = req.body;
 
-  const user = await User.findOne({ username });
-  if (!user) return res.json({ message: "No user" });
+  if (users.find(u => u.username === username)) {
+    return res.json({ msg: "User exists" });
+  }
 
-  const ok = await bcrypt.compare(password, user.password);
-  if (!ok) return res.json({ message: "Wrong password" });
+  const hash = bcrypt.hashSync(password, 10);
+  users.push({ username, password: hash });
 
-  const token = jwt.sign({ username }, "secret123");
+  writeJSON('users.json', users);
+  res.json({ msg: "Account created" });
+});
 
+app.post('/api/login', (req, res) => {
+  const users = readJSON('users.json');
+  const { username, password } = req.body;
+
+  const user = users.find(u => u.username === username);
+  if (!user) return res.json({ msg: "Create account first" });
+
+  if (!bcrypt.compareSync(password, user.password)) {
+    return res.json({ msg: "Wrong password" });
+  }
+
+  const token = jwt.sign({ username }, SECRET);
   res.json({ token });
 });
 
-// Upload
-app.post("/api/upload", auth, upload.array("files"), (req, res) => {
-  res.json({ message: "Uploaded" });
+/* ================= UPLOAD (ENCRYPTED FILE RECEIVED) ================= */
+app.post('/api/upload', auth, upload.array('files'), (req, res) => {
+  const files = readJSON('files.json');
+
+  req.files.forEach(f => {
+    const filename = Date.now() + "-" + f.originalname;
+
+    fs.writeFileSync(path.join('uploads', filename), f.buffer);
+
+    files.push({
+      owner: req.user.username,
+      filename
+    });
+  });
+
+  writeJSON('files.json', files);
+  res.json({ msg: "Uploaded" });
 });
 
-// Files list
-app.get("/api/files", auth, (req, res) => {
-  const dir = "uploads/" + req.user;
-  if (!fs.existsSync(dir)) return res.json([]);
-  res.json(fs.readdirSync(dir));
+/* ================= GET FILES ================= */
+app.get('/api/files', auth, (req, res) => {
+  const files = readJSON('files.json');
+  const shares = readJSON('shares.json');
+
+  const myFiles = files
+    .filter(f => f.owner === req.user.username)
+    .map(f => f.filename);
+
+  const shared = shares
+    .filter(s => s.to === req.user.username)
+    .map(s => s.filename);
+
+  res.json({ files: myFiles, shared });
 });
 
-// Download
-app.get("/api/download/:file", auth, (req, res) => {
-  const filePath = "uploads/" + req.user + "/" + req.params.file;
-  if (!fs.existsSync(filePath)) return res.send("Not found");
-  res.download(filePath);
+/* ================= DOWNLOAD ================= */
+app.get('/api/download/:name', (req, res) => {
+  const token = req.query.token;
+
+  try {
+    jwt.verify(token, SECRET);
+    res.download(path.join('uploads', req.params.name));
+  } catch {
+    res.sendStatus(403);
+  }
 });
 
-// Delete
-app.delete("/api/delete/:file", auth, (req, res) => {
-  const filePath = "uploads/" + req.user + "/" + req.params.file;
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  res.send("Deleted");
+/* ================= DELETE ================= */
+app.delete('/api/delete/:name', auth, (req, res) => {
+  let files = readJSON('files.json');
+
+  const file = files.find(f => f.filename === req.params.name);
+
+  if (!file || file.owner !== req.user.username) {
+    return res.sendStatus(403);
+  }
+
+  files = files.filter(f => f.filename !== req.params.name);
+  writeJSON('files.json', files);
+
+  fs.unlinkSync(path.join('uploads', req.params.name));
+
+  res.json({ msg: "Deleted" });
 });
 
-// ===== START =====
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log("Server running"));
+/* ================= SHARE ================= */
+app.post('/api/share', auth, (req, res) => {
+  const { filename, toUser } = req.body;
+
+  let shares = readJSON('shares.json');
+
+  shares.push({
+    from: req.user.username,
+    to: toUser,
+    filename
+  });
+
+  writeJSON('shares.json', shares);
+
+  res.json({ msg: "Shared" });
+});
+
+/* ================= START ================= */
+app.listen(4000, () => {
+  console.log("🔐 Zero-Knowledge Vault running on http://localhost:4000");
+});

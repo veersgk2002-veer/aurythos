@@ -1,92 +1,134 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Aurythos Vault</title>
-<style>
-body {
-  background:#0b1f3a;
-  font-family:sans-serif;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  height:100vh;
-}
-.box {
-  background:white;
-  padding:25px;
-  border-radius:10px;
-  width:280px;
-  text-align:center;
-}
-input {
-  width:100%;
-  padding:10px;
-  margin:8px 0;
-}
-button {
-  width:100%;
-  padding:10px;
-  background:#2f6fed;
-  color:white;
-  border:none;
-  margin-top:10px;
-}
-.link {
-  margin-top:10px;
-  color:#2f6fed;
-  cursor:pointer;
-}
-</style>
+  <title>Vault</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .card {
+      background: white;
+      padding: 25px;
+      width: 320px;
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+      text-align: center;
+    }
+
+    h2 {
+      color: #1877f2;
+      margin-bottom: 20px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      font-size: 14px;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 5px;
+    }
+
+    .login {
+      background: #1877f2;
+      color: white;
+    }
+
+    .register {
+      background: white;
+      color: #1877f2;
+      border: 1px solid #1877f2;
+    }
+
+    #msg {
+      margin-top: 10px;
+      font-size: 13px;
+      color: red;
+    }
+
+    .small {
+      margin-top: 10px;
+      font-size: 12px;
+      color: gray;
+    }
+  </style>
 </head>
+
 <body>
 
-<div class="box">
-<h3>Aurythos Vault</h3>
+<div class="card">
+  <h2>Vault</h2>
 
-<input id="username" placeholder="Username">
-<input id="password" type="password" placeholder="Password">
+  <!-- ✅ USERNAME instead of email -->
+  <input id="username" placeholder="Username">
+  <input id="password" type="password" placeholder="Password">
 
-<button onclick="login()">Login</button>
-<div class="link" onclick="register()">Create account</div>
+  <button class="login" onclick="login()">Log In</button>
+  <button class="register" onclick="register()">Create Account</button>
 
+  <p id="msg"></p>
+  <p class="small">Secure • Private • Simple</p>
 </div>
 
 <script>
-async function login(){
-  const username = usernameInput.value;
-  const password = passwordInput.value;
-
-  const res = await fetch("/api/login", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({username,password})
+async function register() {
+  const res = await fetch('/api/register', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      username: username.value,
+      password: password.value
+    })
   });
 
   const data = await res.json();
 
-  if(data.token){
-    localStorage.setItem("token", data.token);
-    window.location.href="/vault.html";
+  if (data.error) {
+    msg.innerText = data.error;
   } else {
-    alert(data.message);
+    // auto login after register
+    await login();
   }
 }
 
-async function register(){
-  const username = usernameInput.value;
-  const password = passwordInput.value;
-
-  await fetch("/api/register",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({username,password})
+async function login() {
+  const res = await fetch('/api/login', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      username: username.value,
+      password: password.value
+    })
   });
 
-  alert("Registered. Now login.");
-}
+  const data = await res.json();
 
-const usernameInput = document.getElementById("username");
-const passwordInput = document.getElementById("password");
+  if (data.token) {
+    localStorage.setItem("token", data.token);
+    window.location.href = "/vault.html";
+  } else {
+    msg.innerText = data.error;
+  }
+}
 </script>
 
 </body>

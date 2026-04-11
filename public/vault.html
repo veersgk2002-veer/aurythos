@@ -1,76 +1,303 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Vault</title>
-<style>
-body {font-family:sans-serif;background:#f5f7fb;padding:20px;}
-button {background:#2f6fed;color:white;border:none;padding:8px;}
-.file {background:white;margin:10px 0;padding:10px;}
-</style>
+  <title>Vault</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      background: #f0f2f5;
+    }
+
+    .header {
+      background: #1877f2;
+      color: white;
+      padding: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .container {
+      padding: 15px;
+    }
+
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    input, button {
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      margin-top: 5px;
+    }
+
+    button {
+      background: #1877f2;
+      color: white;
+      border: none;
+      margin-right: 5px;
+      cursor: pointer;
+    }
+
+    .file {
+      border-bottom: 1px solid #eee;
+      padding: 10px 0;
+    }
+
+    img, video {
+      max-width: 100%;
+      margin-top: 10px;
+      border-radius: 8px;
+    }
+  </style>
 </head>
+
 <body>
 
-<h2>Your Vault</h2>
+<div class="header">
+  <h3>🔐 Vault (<span id="username"></span>)</h3>
+  <button onclick="logout()">Logout</button>
+</div>
 
-<input type="file" id="files" multiple>
-<button onclick="upload()">Upload</button>
+<div class="container">
 
-<div id="list"></div>
+  <!-- UNLOCK -->
+  <div class="card">
+    <h3>Unlock Vault</h3>
+    <input type="password" id="vaultPassword" placeholder="Enter password">
+    <button onclick="unlockVault()">Unlock</button>
+  </div>
+
+  <!-- UPLOAD -->
+  <div class="card">
+    <input type="file" id="fileInput" multiple>
+    <button onclick="upload()">Upload</button>
+  </div>
+
+  <!-- FILES -->
+  <div class="card">
+    <h3>Your Files</h3>
+    <div id="files"></div>
+  </div>
+
+  <!-- SHARE -->
+  <div class="card">
+    <h3>Share</h3>
+    <input id="shareUser" placeholder="Enter username">
+    <button onclick="share()">Share Selected</button>
+  </div>
+
+  <!-- SHARED -->
+  <div class="card">
+    <h3>Shared With You</h3>
+    <div id="shared"></div>
+  </div>
+
+</div>
 
 <script>
 const token = localStorage.getItem("token");
+if (!token) location.href = "/";
 
-if(!token){
-  window.location.href="/";
+let vaultKey = null;
+let selectedFile = null;
+
+/* USERNAME */
+function getUsername() {
+  return JSON.parse(atob(token.split('.')[1])).username;
+}
+document.getElementById("username").innerText = getUsername();
+
+/* KEY */
+async function getKey(password) {
+  const enc = new TextEncoder();
+
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: enc.encode("vault_salt"),
+      iterations: 100000,
+      hash: "SHA-256"
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
 }
 
-async function load(){
-  const res = await fetch("/api/files",{
-    headers:{Authorization:"Bearer "+token}
+/* UNLOCK */
+async function unlockVault() {
+  const password = document.getElementById("vaultPassword").value;
+  if (!password) return alert("Enter password");
+
+  vaultKey = await getKey(password);
+  alert("Vault unlocked ✅");
+}
+
+/* LOAD FILES */
+async function load() {
+  const res = await fetch('/api/files', {
+    headers: { Authorization: token }
   });
 
-  const files = await res.json();
+  const data = await res.json();
+  const container = document.getElementById("files");
+  container.innerHTML = "";
 
-  let html="";
-  files.forEach(f=>{
-    html += `
-    <div class="file">
-      ${f}
+  data.files.forEach(f => {
+    const div = document.createElement("div");
+    div.className = "file";
+
+    div.innerHTML = `
+      <b>${f}</b><br>
+      <button onclick="preview('${f}')">Preview</button>
       <button onclick="download('${f}')">Download</button>
-      <button onclick="del('${f}')">Delete</button>
-    </div>`;
+      <button onclick="removeFile('${f}')">Delete</button>
+      <button onclick="selectFile('${f}')">Share</button>
+      <div id="preview-${f}"></div>
+    `;
+
+    container.appendChild(div);
   });
 
-  document.getElementById("list").innerHTML = html;
+  document.getElementById("shared").innerHTML =
+    data.shared.map(f => `<div>${f}</div>`).join("");
 }
 
-async function upload(){
-  const input = document.getElementById("files");
-  const formData = new FormData();
+/* UPLOAD */
+async function upload() {
+  if (!vaultKey) return alert("Unlock vault first");
 
-  for(let i=0;i<input.files.length;i++){
-    formData.append("files", input.files[i]);
+  const files = document.getElementById("fileInput").files;
+  const form = new FormData();
+
+  for (let file of files) {
+    const buffer = await file.arrayBuffer();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+
+    const encrypted = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      vaultKey,
+      buffer
+    );
+
+    const blob = new Blob([iv, new Uint8Array(encrypted)]);
+    form.append("files", blob, file.name + ".enc");
   }
 
-  await fetch("/api/upload",{
-    method:"POST",
-    headers:{Authorization:"Bearer "+token},
-    body:formData
+  await fetch('/api/upload', {
+    method: 'POST',
+    headers: { Authorization: token },
+    body: form
   });
 
   load();
 }
 
-function download(f){
-  window.open("/api/download/"+f+"?token="+token);
+/* PREVIEW */
+async function preview(name) {
+  if (!vaultKey) return alert("Unlock vault first");
+
+  const res = await fetch('/api/download/' + name + '?token=' + token);
+  const buffer = await res.arrayBuffer();
+
+  const iv = buffer.slice(0, 12);
+  const data = buffer.slice(12);
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    vaultKey,
+    data
+  );
+
+  const blob = new Blob([decrypted]);
+  const url = URL.createObjectURL(blob);
+
+  const previewDiv = document.getElementById("preview-" + name);
+
+  if (name.match(/\.(jpg|jpeg|png|gif)/i)) {
+    previewDiv.innerHTML = `<img src="${url}">`;
+  } else if (name.match(/\.(mp4|webm)/i)) {
+    previewDiv.innerHTML = `<video controls src="${url}"></video>`;
+  } else {
+    previewDiv.innerHTML = `<a href="${url}" target="_blank">Open File</a>`;
+  }
 }
 
-async function del(f){
-  await fetch("/api/delete/"+f,{
-    method:"DELETE",
-    headers:{Authorization:"Bearer "+token}
+/* DOWNLOAD */
+async function download(name) {
+  if (!vaultKey) return alert("Unlock vault first");
+
+  const res = await fetch('/api/download/' + name + '?token=' + token);
+  const buffer = await res.arrayBuffer();
+
+  const iv = buffer.slice(0, 12);
+  const data = buffer.slice(12);
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    vaultKey,
+    data
+  );
+
+  const blob = new Blob([decrypted]);
+  const a = document.createElement("a");
+
+  a.href = URL.createObjectURL(blob);
+  a.download = name.replace(".enc", "");
+  a.click();
+}
+
+/* DELETE */
+async function removeFile(name) {
+  await fetch('/api/delete/' + name, {
+    method: 'DELETE',
+    headers: { Authorization: token }
   });
   load();
+}
+
+/* SHARE */
+function selectFile(name) {
+  selectedFile = name;
+  alert("Selected: " + name);
+}
+
+async function share() {
+  const user = document.getElementById("shareUser").value;
+
+  await fetch('/api/share', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: token
+    },
+    body: JSON.stringify({
+      filename: selectedFile,
+      toUser: user
+    })
+  });
+
+  alert("Shared");
+}
+
+/* LOGOUT */
+function logout() {
+  localStorage.removeItem("token");
+  location.href = "/";
 }
 
 load();
